@@ -52,6 +52,8 @@ uint8_t isChecksumVaild(PACKET_T* pak){
 		chk +=pak->data[i];
 	chk += pak->checksum;
 
+	chk = ((chk >> 8) + chk) & 0xFF;
+
 	if(chk != 0xFF)
 		return FALSE;
 	return TRUE;
@@ -93,7 +95,7 @@ void generateCheckSum(PACKET_T* pak){
 	chk += pak->transmissionNumber;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
-	pak->checksum = (chk >> 8) + chk;
+	pak->checksum = ((chk >> 8) + chk) ^ 0xFF;
 
 	return;
 }
@@ -140,7 +142,7 @@ void SendACK(void){
 	COMMAND_CAST_T* repsonse_comm = (COMMAND_CAST_T*)repsonse.data;
 	repsonse_comm->command = ACK;
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	RingBuffer_InsertMult(&txbuf, &repsonse, sizeof(PACKET_T));
+	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
 }
 
 void SendNAK(void){
@@ -148,7 +150,7 @@ void SendNAK(void){
 	COMMAND_CAST_T* repsonse_comm = (COMMAND_CAST_T*)repsonse.data;
 	repsonse_comm->command = NAK;
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	RingBuffer_InsertMult(&txbuf, &repsonse, sizeof(PACKET_T));
+	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
 }
 
 void processUART_Receive(void){
@@ -190,6 +192,9 @@ void processUART_Receive(void){
 					case TAL:
 						UART_TAL_FLAG = TRUE;
 						break;
+					case ECHO:
+						SendACK();
+						break;
 				}
 			}else{	//Check Sum Error
 				SendNAK();
@@ -212,7 +217,8 @@ void processUART_Transmit(void){
 	if(UART_ACK_FLAG){
 		if(RingBuffer_GetCount(&tpktbuf) >= sizeof(PACKET_T)){
 			RingBuffer_PopMult(&tpktbuf, &repeatBuf, sizeof(PACKET_T));
-			RingBuffer_InsertMult(&txbuf, &repeatBuf, sizeof(PACKET_T));
+
+			Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, sizeof(PACKET_T));
 
 			startTimer(500, &UART_TIMEOUT_FLAG);	//500ms
 		}
@@ -221,8 +227,8 @@ void processUART_Transmit(void){
 	}
 
 	if(UART_TIMEOUT_FLAG || UART_NAK_FLAG){
-		RingBuffer_InsertMult(&txbuf, &repeatBuf, sizeof(PACKET_T));
-		//Set time out
+		Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, sizeof(PACKET_T));
+		startTimer(500, &UART_TIMEOUT_FLAG);	//500ms
 		UART_NAK_FLAG  = UART_TIMEOUT_FLAG = FALSE;
 		return;
 	}

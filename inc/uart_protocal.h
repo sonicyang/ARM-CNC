@@ -53,7 +53,7 @@ typedef struct {
 } COMMAND_CAST_T;	//size should be identical to DATA_SIZE
 
 enum{
-	IDLE,
+	IDLE = 1,
 	MOVE,
 	ACTIVE,
 	DEACTIVE,
