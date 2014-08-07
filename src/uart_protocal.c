@@ -59,34 +59,6 @@ uint8_t isChecksumVaild(PACKET_T* pak){
 	return TRUE;
 }
 
-uint8_t isCmdChecksumVaild(CMD_PACKET_T* pak){
-	uint16_t chk = 0;
-
-	chk += 0xAA + 0xAA + 0xAA;
-	chk += pak->transmissionNumber;
-	chk += pak->packetCount;
-	chk += pak->dataLength;
-	chk += pak->command;
-	chk += pak->checksum;
-
-	if(chk != 0xFF)
-		return FALSE;
-	return TRUE;
-}
-
-uint8_t isDataChecksumVaild(DATA_PACKET_T* pak){
-	uint8_t i;
-	uint16_t chk = 0;
-
-	for(i = 0; i < 127; i++)
-		chk +=pak->data[i];
-	chk += pak->checksum;
-
-	if(chk != 0xFF)
-		return FALSE;
-	return TRUE;
-}
-
 void generateCheckSum(PACKET_T* pak){
 	uint8_t i;
 	uint16_t chk = 0;
@@ -96,32 +68,6 @@ void generateCheckSum(PACKET_T* pak){
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
 	pak->checksum = ((chk >> 8) + chk) ^ 0xFF;
-
-	return;
-}
-
-void generateCmdCheckSum(CMD_PACKET_T* pak){
-	uint16_t chk = 0;
-
-	chk += 0xAA + 0xAA + 0xAA;
-	chk += pak->transmissionNumber;
-	chk += pak->packetCount;
-	chk += pak->dataLength;
-	chk += pak->command;
-
-	pak->checksum = (chk >> 8) + chk;
-
-	return;
-}
-
-void generateDataCheckSum(DATA_PACKET_T* pak){
-	uint8_t i;
-	uint16_t chk = 0;
-
-	for(i = 0; i < 127; i++)
-		chk +=pak->data[i];
-
-	pak->checksum = (chk >> 8) + chk;
 
 	return;
 }

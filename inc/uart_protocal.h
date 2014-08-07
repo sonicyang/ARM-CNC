@@ -28,20 +28,6 @@ typedef struct {
 } PACKET_T;
 
 typedef struct {
-	uint8_t 	magicNumber[3];	//Indicates packet 0xAA 0xAA 0xAA
-	uint8_t		transmissionNumber;
-	uint8_t 	command;
-	uint8_t 	packetCount;
-	uint32_t 	dataLength;
-	uint8_t		checksum;
-} CMD_PACKET_T;
-
-typedef struct {
-	uint8_t 	data[127];
-	uint8_t		checksum;
-} DATA_PACKET_T;
-
-typedef struct {
 	uint16_t command;
 	int16_t	p1;
 	int16_t	p2;
@@ -68,12 +54,8 @@ void UART_IRQHandler(void);
 void UART_init(void);
 
 uint8_t isChecksumVaild(PACKET_T*);
-uint8_t isCmdChecksumVaild(CMD_PACKET_T*);
-uint8_t isDataChecksumVaild(DATA_PACKET_T*);
 
 void generateCheckSum(PACKET_T*);
-void generateCmdCheckSum(CMD_PACKET_T*);
-void generateDataCheckSum(DATA_PACKET_T*);
 
 uint8_t isCmdStart(void);
 
