@@ -17,6 +17,7 @@
 #endif
 
 #include "uart_protocal.h"
+#include "motorController.h"
 #include "timer.h"
 
 uint32_t UART_REVEICE_FLAG, UART_TRANSMIT_FLAG;
@@ -34,6 +35,7 @@ int main(void) {
     SysTick_Init();
 
     UART_init();
+    motorControllerInit();
 
     startTimer(50, &UART_REVEICE_FLAG);
     startTimer(50, &UART_TRANSMIT_FLAG);

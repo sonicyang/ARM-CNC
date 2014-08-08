@@ -8,6 +8,7 @@
 #include "uart_protocal.h"
 #include "motorController.h"
 #include "timer.h"
+#include <stdio.h>
 
 PACKET_T repeatBuf;
 uint32_t UART_TIMEOUT_FLAG = 0;
@@ -46,15 +47,13 @@ uint8_t isChecksumVaild(PACKET_T* pak){
 	uint8_t i;
 	uint16_t chk = 0;
 
-	chk += 0xAA + 0xAA + 0xAA;
 	chk += pak->transmissionNumber;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
-	chk += pak->checksum;
 
 	chk = ((chk >> 8) + chk) & 0xFF;
 
-	if(chk != 0xFF)
+	if(chk != pak->checksum)
 		return FALSE;
 	return TRUE;
 }
@@ -63,11 +62,10 @@ void generateCheckSum(PACKET_T* pak){
 	uint8_t i;
 	uint16_t chk = 0;
 
-	chk += 0xAA + 0xAA + 0xAA;
 	chk += pak->transmissionNumber;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
-	pak->checksum = ((chk >> 8) + chk) ^ 0xFF;
+	pak->checksum = ((chk >> 8) + chk);
 
 	return;
 }
@@ -99,6 +97,14 @@ void SendNAK(void){
 	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
 }
 
+void SendTAL(void){
+	PACKET_T repsonse;
+	COMMAND_CAST_T* repsonse_comm = (COMMAND_CAST_T*)repsonse.data;
+	repsonse_comm->command = TAL;
+	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
+	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
+}
+
 void processUART_Receive(void){
 
 	while(RingBuffer_GetCount(&rxbuf) >= sizeof(PACKET_T)){
@@ -106,7 +112,7 @@ void processUART_Receive(void){
 
 		if(isPacketStart()){
 			PACKET_T data;
-			COMMAND_CAST_T* comm = (COMMAND_CAST_T*)data.data;	//watch out for eadian
+			COMMAND_CAST_T* comm = (COMMAND_CAST_T*)data.data;
 
 			RingBuffer_PopMult(&rxbuf, &data, sizeof(PACKET_T));
 
@@ -116,8 +122,10 @@ void processUART_Receive(void){
 						UART_TAL_FLAG = FALSE;
 						break;
 					case MOVE:
-						moveAbsolutly(comm->p1, comm->p2);
-						SendACK();
+						if(moveAbsolutly(comm->p1, comm->p2))
+							SendTAL();
+						else
+							SendACK();
 						break;
 					case ACTIVE:
 
@@ -140,14 +148,15 @@ void processUART_Receive(void){
 						break;
 					case ECHO:
 						SendACK();
+						printf("ECHO %d\n", comm->p1);
 						break;
 				}
 			}else{	//Check Sum Error
 				SendNAK();
 			}
+		}else{
+			RingBuffer_Pop(&rxbuf, &trash);
 		}
-
-		RingBuffer_Pop(&rxbuf, &trash);
 	}
 
 	return;
@@ -157,7 +166,7 @@ void processUART_Transmit(void){
 	if(UART_TAL_FLAG)
 		return;
 
-	if(RingBuffer_IsFull(&txbuf))
+	if(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T))
 		return;
 
 	if(UART_ACK_FLAG){

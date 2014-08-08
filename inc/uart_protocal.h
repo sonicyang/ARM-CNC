@@ -62,6 +62,7 @@ uint8_t isCmdStart(void);
 //void SendPacketWrapper(PACKET_T* pak);
 void SendACK(void);
 void SendNAK(void);
+void SendTAL(void);
 
 void processUART_Receive(void);
 void processUART_Transmit(void);

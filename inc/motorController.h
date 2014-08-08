@@ -34,12 +34,12 @@ void DisableOutput(void);
 
 void SetSpeed(uint16_t rate);
 
-void moveAbsolutly(int32_t x, int32_t y);
+uint8_t moveAbsolutly(int32_t x, int32_t y);
+uint8_t moveRelativly(int32_t x, int32_t y);
 
-void moveRelativly(int32_t x, int32_t y);
+uint8_t bufferHasEnoughRoom(int32_t x, int32_t y);
 
 void InsertMove(int8_t x, int8_t y);
-
 void processMoves(void);
 
 

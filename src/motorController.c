@@ -10,16 +10,21 @@
 
 void motorControllerInit(void){
 	RingBuffer_Init(&movebuf, movebuf_base, 1, MOVE_RB_SIZE);
+	xPosition = yPosition = 0;
 	//Do GPIO Init Here;
 	return;
 }
 
-void moveAbsolutly(int32_t x, int32_t y){
-	moveRelativly(x - xPosition, y - yPosition);
+uint8_t moveAbsolutly(int32_t x, int32_t y){
+	return moveRelativly(x - xPosition, y - yPosition);
 }
 
 /* Move tool base on relative position */
-void moveRelativly(int32_t x, int32_t y){
+/* no err = 0, else = 1*/
+uint8_t moveRelativly(int32_t x, int32_t y){
+	if(!bufferHasEnoughRoom(x, y))
+		return 1;
+
 	uint32_t i, error_acc;
 
 	//Decide Direction of rotation
@@ -65,6 +70,12 @@ void moveRelativly(int32_t x, int32_t y){
 			}
 		}
 	}
+
+	return 0;
+}
+
+uint8_t bufferHasEnoughRoom(int32_t x, int32_t y){
+	return (RingBuffer_GetFree(&movebuf) >= MAX(x, y));
 }
 
 void InsertMove(int8_t x, int8_t y){
