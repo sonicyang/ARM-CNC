@@ -43,6 +43,8 @@ def UARTTranciver():
     global txbuf
     global rxbuf
 
+    Timeout_Count = 0
+
     UART_ACK_FLAG = 1
     UART_NAK_FLAG = 0
     UART_TIMEOUT_FLAG = 0
@@ -50,27 +52,29 @@ def UARTTranciver():
     UART_ACK_PENGING = 0   
 
     repeat_buf = PACKET_T()
-    start_time = time.time()
+    target_time = time.time()
+
+    print (target_time)
 
     ser = serial.Serial("/dev/tty.SLAB_USBtoUART", 115200, timeout=0.2) # 200ms
     
 
     while(SystemRunning):
-        
+
+        if(UART_TAL_FLAG):
+            time.sleep(2)
+
         if(UART_NAK_FLAG or UART_TIMEOUT_FLAG or UART_TAL_FLAG):
             ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.transmissionNumber,\
                     repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.data[3], \
                     repeat_buf.data[4], repeat_buf.data[5], repeat_buf.data[6], repeat_buf.checksum))
 
-            print("reSend", repeat_buf.data[0])
-            UART_ACK_PENDING = 1
-            start_time = time.time()
+            print("ReSend", repeat_buf.data[0])
             
-            if(UART_TAL_FLAG):
-                time.sleep(2)
+            UART_ACK_PENDING = 1
+            target_time = time.time() + 0.5
 
             UART_NAK_FLAG = UART_TIMEOUT_FLAG = UART_TAL_FLAG = 0
-        
 
         if((not txbuf.empty()) and (UART_ACK_FLAG)):
             packet = txbuf.get();
@@ -82,34 +86,42 @@ def UARTTranciver():
 
             print("Send", packet.data[0])
             repeat_buf = packet
+
             UART_ACK_PENDING = 1
-            start_time = time.time()
+            target_time = time.time() + 0.5
+
             UART_ACK_FLAG = 0
 
         if(not rxbuf.full()):
             raw_data = ser.read(PACKET_SIZE);
-            if(len(raw_data) < 21):
-                continue
+            if(len(raw_data) >= 21):
 
-            packet = PACKET_T()
-            packet.magicNumber[0], packet.magicNumber[1], packet.magicNumber[2],\
-                    packet.transmissionNumber, packet.command, packet.data[0], packet.data[1], \
-                    packet.data[2], packet.data[3], packet.data[4], packet.data[5], packet.data[6],\
-                    packet.checksum = struct.unpack(PACKET_FMT, raw_data);
+                packet = PACKET_T()
+                packet.magicNumber[0], packet.magicNumber[1], packet.magicNumber[2],\
+                        packet.transmissionNumber, packet.command, packet.data[0], packet.data[1], \
+                        packet.data[2], packet.data[3], packet.data[4], packet.data[5], packet.data[6],\
+                        packet.checksum = struct.unpack(PACKET_FMT, raw_data);
 
-            if(packet.command == ACK):
-                UART_ACK_FLAG = 1
-                print("GOT ACK")
-                UART_ACK_PENDING = 0
-            elif(packet.command == NAK):
-                UART_NAK_FLAG = 1
-                UART_ACK_PENGING = 0
-            elif(packet.command == TAL):
-                UART_TAL_FLAG = 1
-                UART_ACK_PENGING = 0
-
-        if(((time.time() - start_time) > 1) and UART_ACK_PENDING):
+                if(packet.command == ACK):
+                    UART_ACK_FLAG = 1
+                    print("GOT ACK")
+                    UART_ACK_PENDING = 0
+                elif(packet.command == NAK):
+                    UART_NAK_FLAG = 1
+                    print("GOT NAK")
+                    UART_ACK_PENGING = 0
+                elif(packet.command == TAL):
+                    UART_TAL_FLAG = 1
+                    print("GOT TAL")
+                    UART_ACK_PENGING = 0
+        
+        if(((time.time() >= target_time)) and UART_ACK_PENDING):
             UART_TIMEOUT_FLAG = 1
+            Timeout_Count += 1
+            if(Timeout_Count >= 20):
+                raise Exception("Connection Timeout")
+        elif(not UART_ACK_PENGING):
+            Timeout_Count = 0
 
         time.sleep(0)
 
@@ -121,22 +133,21 @@ def main():
     SystemRunning = 1
     txbuf = queue.Queue(256)
     rxbuf = queue.Queue(256)
-    
 
     UARTTranciverThread = Thread(target = UARTTranciver)
     UARTTranciverThread.start()
-    count  = 0 
+    count  = 379 
     while(SystemRunning):
         
         packet = PACKET_T()
-        packet.command = MOVE 
+        packet.command = ECHO 
         packet.data[0]  = count
         packet.data[1]  = count
         
         txbuf.put(packet)
     #    print("Add", count)
 
-        time.sleep(0.1)
+        time.sleep(0.05)
         count += 1
     SystemRunning = 0
     UARTTranciverThread.join()

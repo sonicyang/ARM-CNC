@@ -14,7 +14,7 @@
 
 #define UART_RB_SIZE 256
 #define UART_TRANSMIT_RB_SIZE 16
-#define	DATA_SIZE 16
+#define	DATA_SIZE 7
 
 RINGBUFF_T txbuf, rxbuf, tpktbuf;
 
@@ -23,7 +23,8 @@ uint8_t	txbuf_base[UART_RB_SIZE], rxbuf_base[UART_RB_SIZE], tpktbuf_base[UART_TR
 typedef struct {
 	uint8_t 	magicNumber[3];	//Indicates packet 0xAA 0xAA 0xAA
 	uint8_t		transmissionNumber;
-	uint8_t 	data[DATA_SIZE];
+	uint16_t	command;
+	uint16_t 	data[DATA_SIZE];
 	uint8_t		checksum;
 } PACKET_T;
 

@@ -48,6 +48,7 @@ uint8_t isChecksumVaild(PACKET_T* pak){
 	uint16_t chk = 0;
 
 	chk += pak->transmissionNumber;
+	chk += pak->command;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
 
@@ -63,6 +64,7 @@ void generateCheckSum(PACKET_T* pak){
 	uint16_t chk = 0;
 
 	chk += pak->transmissionNumber;
+	chk += pak->command;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
 	pak->checksum = ((chk >> 8) + chk);
@@ -82,27 +84,24 @@ uint8_t isPacketStart(void){
 }
 
 void SendACK(void){
-	PACKET_T repsonse;
-	COMMAND_CAST_T* repsonse_comm = (COMMAND_CAST_T*)repsonse.data;
-	repsonse_comm->command = ACK;
+	PACKET_T response;
+	response.command = ACK;
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
+	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
 }
 
 void SendNAK(void){
-	PACKET_T repsonse;
-	COMMAND_CAST_T* repsonse_comm = (COMMAND_CAST_T*)repsonse.data;
-	repsonse_comm->command = NAK;
+	PACKET_T response;
+	response.command = NAK;
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
+	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
 }
 
 void SendTAL(void){
-	PACKET_T repsonse;
-	COMMAND_CAST_T* repsonse_comm = (COMMAND_CAST_T*)repsonse.data;
-	repsonse_comm->command = TAL;
+	PACKET_T response;
+	response.command = TAL;
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	Chip_UART_SendRB(LPC_USART, &txbuf, &repsonse, sizeof(PACKET_T));
+	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
 }
 
 void processUART_Receive(void){
@@ -112,17 +111,16 @@ void processUART_Receive(void){
 
 		if(isPacketStart()){
 			PACKET_T data;
-			COMMAND_CAST_T* comm = (COMMAND_CAST_T*)data.data;
 
 			RingBuffer_PopMult(&rxbuf, &data, sizeof(PACKET_T));
 
 			if(isChecksumVaild(&data)){
-				switch(comm->command){
+				switch(data.command){
 					case IDLE:
 						UART_TAL_FLAG = FALSE;
 						break;
 					case MOVE:
-						if(moveAbsolutly(comm->p1, comm->p2))
+						if(moveAbsolutly(data.data[0], data.data[2]))
 							SendTAL();
 						else
 							SendACK();
@@ -148,7 +146,7 @@ void processUART_Receive(void){
 						break;
 					case ECHO:
 						SendACK();
-						printf("ECHO %d\n", comm->p1);
+						printf("ECHO %d\n", data.data[0]);
 						break;
 				}
 			}else{	//Check Sum Error

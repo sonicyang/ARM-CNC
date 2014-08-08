@@ -103,8 +103,11 @@ void StepY(uint8_t direction){
 }
 
 void processMoves(void){
+	if(RingBuffer_IsEmpty(&movebuf))
+		return;
+
 	MOVE_T aMove;
-	Ringbuffer_Pop(&movebuf, &aMove);
+	RingBuffer_Pop(&movebuf, &aMove);
 
 	if(aMove.x)
 		StepX(aMove.x);

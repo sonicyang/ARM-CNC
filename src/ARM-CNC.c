@@ -20,7 +20,7 @@
 #include "motorController.h"
 #include "timer.h"
 
-uint32_t UART_REVEICE_FLAG, UART_TRANSMIT_FLAG;
+uint32_t UART_REVEICE_FLAG, UART_TRANSMIT_FLAG, MOVEMENT_PROCESS_FLAG;
 
 int main(void) {
 
@@ -37,8 +37,9 @@ int main(void) {
     UART_init();
     motorControllerInit();
 
-    startTimer(50, &UART_REVEICE_FLAG);
-    startTimer(50, &UART_TRANSMIT_FLAG);
+    startTimer(20, &UART_REVEICE_FLAG);
+    startTimer(20, &UART_TRANSMIT_FLAG);
+    startTimer(80, &MOVEMENT_PROCESS_FLAG);
 
     /*
 	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 2, 4);
@@ -58,6 +59,12 @@ int main(void) {
     		processUART_Transmit();
     		startTimer(50, &UART_TRANSMIT_FLAG);
     	}
+
+    	if(MOVEMENT_PROCESS_FLAG){
+    		processMoves();
+    		startTimer(80, &MOVEMENT_PROCESS_FLAG);
+    	}
+
     }
     return 0 ;
 }
