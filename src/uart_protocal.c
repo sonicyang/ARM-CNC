@@ -168,14 +168,14 @@ void processUART_Transmit(void){
 		return;
 
 	if(UART_ACK_FLAG){
-		if(RingBuffer_GetCount(&tpktbuf) >= sizeof(PACKET_T)){
-			RingBuffer_PopMult(&tpktbuf, &repeatBuf, sizeof(PACKET_T));
+		if(RingBuffer_GetCount(&tpktbuf) > 0){
+			RingBuffer_Pop(&tpktbuf, &repeatBuf);
 
 			Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, sizeof(PACKET_T));
 
 			startTimer(500, &UART_TIMEOUT_FLAG);	//500ms
+			UART_ACK_FLAG = FALSE;
 		}
-		UART_ACK_FLAG = FALSE;
 		return;
 	}
 
