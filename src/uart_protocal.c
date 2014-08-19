@@ -43,6 +43,13 @@ void UART_init(void){
 	NVIC_EnableIRQ(UART0_IRQn);
 }
 
+void generateHeader(PACKET_T* pak){
+	pak->magicNumber[0] = 0xAA;
+	pak->magicNumber[1] = 0xAA;
+	pak->magicNumber[2] = 0xAA;
+	return;
+}
+
 uint8_t isChecksumVaild(PACKET_T* pak){
 	uint8_t i;
 	uint16_t chk = 0;
@@ -85,21 +92,27 @@ uint8_t isPacketStart(void){
 
 void SendACK(void){
 	PACKET_T response;
+	generateHeader(&response);
 	response.command = ACK;
+	generateCheckSum(&response);
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
 	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
 }
 
 void SendNAK(void){
 	PACKET_T response;
+	generateHeader(&response);
 	response.command = NAK;
+	generateCheckSum(&response);
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
 	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
 }
 
 void SendTAL(void){
 	PACKET_T response;
+	generateHeader(&response);
 	response.command = TAL;
+	generateCheckSum(&response);
 	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
 	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
 }

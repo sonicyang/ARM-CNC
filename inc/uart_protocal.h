@@ -54,8 +54,8 @@ void UART_IRQHandler(void);
 
 void UART_init(void);
 
+void generateHeader(PACKET_T*);
 uint8_t isChecksumVaild(PACKET_T*);
-
 void generateCheckSum(PACKET_T*);
 
 uint8_t isCmdStart(void);
