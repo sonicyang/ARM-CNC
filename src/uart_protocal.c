@@ -133,7 +133,7 @@ void processUART_Receive(void){
 						UART_TAL_FLAG = FALSE;
 						break;
 					case MOVE:
-						if(moveAbsolutly(data.data[0], data.data[2]))
+						if(moveRelativly(data.data[0], data.data[2]))
 							SendTAL();
 						else
 							SendACK();

@@ -4,6 +4,8 @@ import serial
 import queue
 from threading import Thread
 import time
+import sys
+import glob
 
 class PACKET_T:
     def __init__(self):
@@ -65,7 +67,7 @@ def UART_ListPorts():
             pass
     return result
 
-def UART_Init():
+def UART_Init(portname):
     global UARTTranciverThread
     global SystemRunning
     global txbuf
@@ -76,7 +78,7 @@ def UART_Init():
 
     SystemRunning = 1
 
-    UARTTranciverThread = Thread(target = UARTTranciver)
+    UARTTranciverThread = Thread(target = UARTTranciver, args=(portname,))
     UARTTranciverThread.start()
 
 def UART_DeInit():
@@ -109,7 +111,7 @@ def calculateCheckSum(packet):
             + packet.data[4] +  packet.data[5] +  packet.data[6])
     return (((chksum >> 8) + chksum)) & 0xFF
 
-def UARTTranciver():
+def UARTTranciver(portname):
     global SystemRunning
     global txbuf
     global rxbuf
@@ -125,9 +127,8 @@ def UARTTranciver():
     repeat_buf = PACKET_T()
     target_time = time.time()
 
-    ser = serial.Serial("/dev/tty.SLAB_USBtoUART", 115200, timeout=0.2) # 200ms
+    ser = serial.Serial(portname, 115200, timeout=0.2) # 200ms
     
-
     while(SystemRunning):
 
         if(UART_TAL_FLAG):
@@ -138,7 +139,6 @@ def UARTTranciver():
                     repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.data[3], \
                     repeat_buf.data[4], repeat_buf.data[5], repeat_buf.data[6], repeat_buf.checksum))
 
-            print("ReSend", repeat_buf.data[0])
             
             UART_ACK_PENDING = 1
             target_time = time.time() + 0.5
@@ -153,7 +153,6 @@ def UARTTranciver():
                     packet.command, packet.data[0], packet.data[1], packet.data[2], packet.data[3], \
                     packet.data[4], packet.data[5], packet.data[6], packet.checksum))
 
-            print("Send", packet.data[0])
             repeat_buf = packet
 
             UART_ACK_PENDING = 1
@@ -173,15 +172,12 @@ def UARTTranciver():
 
                 if(packet.command == ACK):
                     UART_ACK_FLAG = 1
-                    print("GOT ACK")
                     UART_ACK_PENDING = 0
                 elif(packet.command == NAK):
                     UART_NAK_FLAG = 1
-                    print("GOT NAK")
                     UART_ACK_PENDING = 0
                 elif(packet.command == TAL):
                     UART_TAL_FLAG = 1
-                    print("GOT TAL")
                     UART_ACK_PENDING = 0
         
         if(((time.time() >= target_time)) and UART_ACK_PENDING):

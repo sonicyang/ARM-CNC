@@ -1,1 +1,5 @@
 /Debug/
+*.swp
+*.swo
+*.pyc
+.DS_Store
