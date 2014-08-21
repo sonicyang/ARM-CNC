@@ -40,6 +40,7 @@ void startTimer(uint32_t time, uint32_t* fla){
 			timers[i].flag = fla;
 			timers[i].inUse = TRUE;
 			timers[i].targetTime = sysTickCount + time;
+			break;
 		}
 	}
 }

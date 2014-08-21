@@ -39,30 +39,22 @@ int main(void) {
 
     startTimer(20, &UART_REVEICE_FLAG);
     startTimer(20, &UART_TRANSMIT_FLAG);
-    startTimer(80, &MOVEMENT_PROCESS_FLAG);
-
-    /*
-	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 2, 4);
-	Chip_GPIO_SetPinState(LPC_GPIO_PORT, 2, 5, 0);
-
-	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 2, 5);
-	Chip_GPIO_SetPinState(LPC_GPIO_PORT, 2, 5, 0);*/
-
+    startTimer(1, &MOVEMENT_PROCESS_FLAG);
 
     while(1) {
     	if(UART_REVEICE_FLAG){
     		processUART_Receive();
-    		startTimer(50, &UART_REVEICE_FLAG);
+    		startTimer(20, &UART_REVEICE_FLAG);
     	}
 
     	if(UART_TRANSMIT_FLAG){
     		processUART_Transmit();
-    		startTimer(50, &UART_TRANSMIT_FLAG);
+    		startTimer(20, &UART_TRANSMIT_FLAG);
     	}
 
     	if(MOVEMENT_PROCESS_FLAG){
     		processMoves();
-    		startTimer(80, &MOVEMENT_PROCESS_FLAG);
+    		startTimer(1, &MOVEMENT_PROCESS_FLAG);
     	}
 
     }

@@ -5,13 +5,21 @@
  *      Author: sonicyang
  */
 
+#include "board.h"
 #include "motorController.h"
 #include "ring_buffer.h"
 
 void motorControllerInit(void){
 	RingBuffer_Init(&movebuf, movebuf_base, 1, MOVE_RB_SIZE);
+
 	xPosition = yPosition = 0;
-	//Do GPIO Init Here;
+
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_STEP_PIN);
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_DIR_PIN);
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_Y_STEP_PIN);
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_Y_DIR_PIN);
+
+	feedrate = 20;
 	return;
 }
 
@@ -75,6 +83,7 @@ uint8_t moveRelativly(int32_t x, int32_t y){
 }
 
 uint8_t bufferHasEnoughRoom(int32_t x, int32_t y){
+	printf("%d\n", RingBuffer_GetFree(&movebuf));
 	return (RingBuffer_GetFree(&movebuf) >= MAX(x, y));
 }
 
@@ -89,17 +98,41 @@ void InsertMove(int8_t x, int8_t y){
 }
 
 /* step X motor for one step */
-void StepX(uint8_t direction){
+void StepX(int8_t direction){
+	uint32_t i;
 
-	xPosition += direction;
+	direction = direction < 0 ? 0 : 1;
+
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_DIR_PIN, direction);
+
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_STEP_PIN, 1);
+	Board_LED_Toggle(0);
+	for(i = 0 ; i < 120000; i ++); //Four cycle	3us
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_STEP_PIN, 0);
+	Board_LED_Toggle(0);
+	//for(i = 0 ; i < 4; i ++); //Four cycle	3us
 	return;
 }
 
 /* step Y motor for one step */
-void StepY(uint8_t direction){
+void StepY(int8_t direction){
+	uint32_t i;
 
-	yPosition += direction;
+	direction = direction < 0 ? 0 : 1;
+
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_DIR_PIN, direction);
+
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_STEP_PIN, 1);
+	Board_LED_Toggle(0);
+	for(i = 0 ; i < 120000; i ++); //Four cycle 3us
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, MOTOR_PORT, MOTOR_X_STEP_PIN, 0);
+	Board_LED_Toggle(0);
+	//for(i = 0 ; i < 4; i ++); //Four cycle	3us
 	return;
+}
+
+void SetSpeed(uint16_t rate){
+	feedrate = 200 / rate; //rate -> (mm/s)
 }
 
 void processMoves(void){

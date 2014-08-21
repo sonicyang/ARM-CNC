@@ -11,6 +11,12 @@
 #include <stdint.h>
 #include "ring_buffer.h"
 
+#define MOTOR_PORT	2
+
+#define MOTOR_X_STEP_PIN	4
+#define MOTOR_X_DIR_PIN 	5
+#define MOTOR_Y_STEP_PIN	6
+#define MOTOR_Y_DIR_PIN		7
 #define MOVE_RB_SIZE 256
 
 typedef struct {
@@ -24,10 +30,12 @@ uint8_t	movebuf_base[MOVE_RB_SIZE];
 
 uint32_t xPosition, yPosition;
 
+uint32_t feedrate;
+
 void motorControllerInit(void);
 
-void StepX(uint8_t direction);
-void StepY(uint8_t direction);
+void StepX(int8_t direction);
+void StepY(int8_t direction);
 
 void EnableOutput(void);
 void DisableOutput(void);

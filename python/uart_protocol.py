@@ -34,6 +34,37 @@ global rxbuf
 
 global UARTTranciverThread
 
+def UART_ListPorts():
+    """Lists serial ports
+
+    :raises EnvironmentError:
+        On unsupported or unknown platforms
+    :returns:
+        A list of available serial ports
+    """
+    if sys.platform.startswith('win'):
+        ports = ['COM' + str(i + 1) for i in range(256)]
+
+    elif sys.platform.startswith('linux'):
+        # this is to exclude your current terminal "/dev/tty"
+        ports = glob.glob('/dev/tty[A-Za-z]*')
+
+    elif sys.platform.startswith('darwin'):
+        ports = glob.glob('/dev/tty.*')
+
+    else:
+        raise EnvironmentError('Unsupported platform')
+
+    result = []
+    for port in ports:
+        try:
+            s = serial.Serial(port)
+            s.close()
+            result.append(port)
+        except (OSError, serial.SerialException):
+            pass
+    return result
+
 def UART_Init():
     global UARTTranciverThread
     global SystemRunning
@@ -62,6 +93,16 @@ def UART_Send_ECHO(num):
     
     txbuf.put(packet)
 
+def UART_Send_MOVE(x, y):
+    global txbuf
+
+    packet = PACKET_T()
+    packet.command = MOVE 
+    packet.data[0] = x
+    packet.data[1] = y
+    
+    txbuf.put(packet)
+
 def calculateCheckSum(packet):
     chksum = (packet.transmissionNumber + packet.command \
             + packet.data[0] + packet.data[1] + packet.data[2] + packet.data[3] \
@@ -79,12 +120,10 @@ def UARTTranciver():
     UART_NAK_FLAG = 0
     UART_TIMEOUT_FLAG = 0
     UART_TAL_FLAG = 0
-    UART_ACK_PENGING = 0   
+    UART_ACK_PENDING = 0   
 
     repeat_buf = PACKET_T()
     target_time = time.time()
-
-    print (target_time)
 
     ser = serial.Serial("/dev/tty.SLAB_USBtoUART", 115200, timeout=0.2) # 200ms
     
@@ -139,18 +178,18 @@ def UARTTranciver():
                 elif(packet.command == NAK):
                     UART_NAK_FLAG = 1
                     print("GOT NAK")
-                    UART_ACK_PENGING = 0
+                    UART_ACK_PENDING = 0
                 elif(packet.command == TAL):
                     UART_TAL_FLAG = 1
                     print("GOT TAL")
-                    UART_ACK_PENGING = 0
+                    UART_ACK_PENDING = 0
         
         if(((time.time() >= target_time)) and UART_ACK_PENDING):
             UART_TIMEOUT_FLAG = 1
             Timeout_Count += 1
             if(Timeout_Count >= MAX_TRY_COUNT):
                 raise Exception("Connection Timeout, Disconnected?")
-        elif(not UART_ACK_PENGING):
+        elif(not UART_ACK_PENDING):
             Timeout_Count = 0
 
         time.sleep(0)

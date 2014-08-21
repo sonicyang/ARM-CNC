@@ -24,7 +24,7 @@ typedef struct {
 	uint8_t 	magicNumber[3];	//Indicates packet 0xAA 0xAA 0xAA
 	uint8_t		transmissionNumber;
 	uint16_t	command;
-	uint16_t 	data[DATA_SIZE];
+	int16_t 	data[DATA_SIZE];
 	uint8_t		checksum;
 } PACKET_T;
 
@@ -47,7 +47,8 @@ enum{
 	ACK,
 	NAK,
 	TAL,
-	ECHO
+	ECHO,
+	SPEED
 };
 
 void UART_IRQHandler(void);

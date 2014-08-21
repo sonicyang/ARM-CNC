@@ -1,4 +1,6 @@
 from uart_protocol import *
+import sys
+
 
 def main():
     
@@ -6,14 +8,18 @@ def main():
 
     SystemRunning = 1
 
-    count  = 0 
-    while(SystemRunning):
-        UART_Send_ECHO(count)
-        time.sleep(0.05)
-        count += 1
+    command = ""
+    while(command != "stop"):
+        command = input(">")
+        if(command == "X"):
+            command = input("length?")
+            UART_Send_MOVE(int(command), 0)
+        elif(command == "ECHO"):
+            command = input("Number?")
+            UART_Send_ECHO(int(command))
 
-    UART.DeInit()
+    UART_DeInit()
     SystemRunning = 0
     
-
-main()
+if __name__ == "__main__":
+    main()
