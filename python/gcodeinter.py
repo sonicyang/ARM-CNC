@@ -28,7 +28,10 @@ from numpy import pi, sin, cos, sqrt, arccos, arcsin
 dx=0.2  #resolution in x direction. Unit: mm
 dy=0.2  #resolution in y direction. Unit: mm
 
-speed=0.1  #unit=mm/sec=0.04in/sec
+#speed=10  #unit=mm/sec=0.04in/sec
+
+curr_x_pos = 0
+curr_y_pos = 0
 
 ################################################################################################
 ################################################################################################
@@ -71,6 +74,12 @@ def IJposition(lines):
     return i_pos,j_pos 
 
 def moveto(x_pos,y_pos):
+    global curr_x_pos
+    global curr_y_pos
+
+    x_pos -= curr_x_pos
+    y_pos -= curr_y_pos
+
     #Translate mm into machine blocks
     x_pos /= dx
     y_pos /= dy
@@ -90,6 +99,9 @@ def moveto(x_pos,y_pos):
 
     for i in range(parts):
        UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error)) 
+    
+    curr_x_pos += x_pos
+    curr_y_pos += y_pos
 
     return 
 

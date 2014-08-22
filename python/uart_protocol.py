@@ -105,6 +105,21 @@ def UART_Send_MOVE(x, y):
     
     txbuf.put(packet)
 
+def UART_Send_ACTIVATE():
+    global txbuf
+
+    packet = PACKET_T()
+    packet.command = ACTIVE
+    
+    txbuf.put(packet)
+
+def UART_Send_DEACTIVATE():
+    global txbuf
+
+    packet = PACKET_T()
+    packet.command = DEACTIVE
+    
+    txbuf.put(packet)
 def calculateCheckSum(packet):
     chksum = (packet.transmissionNumber + packet.command \
             + packet.data[0] + packet.data[1] + packet.data[2] + packet.data[3] \
