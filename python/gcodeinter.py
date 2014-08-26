@@ -42,19 +42,25 @@ curr_y_pos = 0
 ################################################################################################
 
 def XYposition(lines):
-    #given a movement command line, return the X Y position
-    xchar_loc=lines.index('X') 
-    i=xchar_loc+1 
-    while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
-        i+=1 
-    x_pos=float(lines[xchar_loc+1:i])     
-    
-    ychar_loc=lines.index('Y') 
-    i=ychar_loc+1 
-    while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
-        i+=1 
-    y_pos=float(lines[ychar_loc+1:i])     
+    x_pos = y_pos = 0
+    try:
+        #given a movement command line, return the X Y position
+        xchar_loc=lines.index('X') 
+        i=xchar_loc+1 
+        while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
+            i+=1 
+        x_pos=float(lines[xchar_loc+1:i])     
+    except:
+        pass
 
+    try:
+        ychar_loc=lines.index('Y') 
+        i=ychar_loc+1 
+        while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
+            i+=1 
+        y_pos=float(lines[ychar_loc+1:i])     
+    except:
+        pass
     return x_pos,y_pos 
 
 def IJposition(lines):
@@ -84,7 +90,7 @@ def moveto(x_pos,y_pos):
     x_pos /= dx
     y_pos /= dy
     
-    parts = math.ceil(max(x_pos, y_pos) / 200)
+    parts = math.ceil(max(abs(x_pos), abs(y_pos)) / 200)
     if parts < 1:
         parts = 1   #for 0,0 bug fix
 
@@ -98,7 +104,13 @@ def moveto(x_pos,y_pos):
     y_pos = math.floor(y_pos)
 
     for i in range(parts):
-       UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error)) 
+       #UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error)) 
+       f = open("movement.txt", "a")
+       f.write(str(x_pos + math.floor(i * x_error)))
+       f.write("\t")
+       f.write(str(y_pos + math.floor(i * y_error)))
+       f.write("\n")
+       f.close
     
     curr_x_pos += x_pos
     curr_y_pos += y_pos
@@ -114,6 +126,7 @@ def moveto(x_pos,y_pos):
 ###########################################################################################
 
 def ExcuteGCode(lines):
+    print(lines);
     try:#read and execute G code
         if lines==[]:
             pass
@@ -142,8 +155,14 @@ def ExcuteGCode(lines):
         elif (lines[0:3]=='G1F')|(lines[0:4]=='G1 F'):
             pass
 
-        elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01'):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
-                
+        elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
+            if lines[0:3]=="G0 ":
+        #        UART_Send_DEACTIVATE()
+                pass
+            else:
+        #        UART_Send_ACTIVATE()
+                pass
+
             [x_pos,y_pos]=XYposition(lines) 
             moveto(x_pos, y_pos) 
             

@@ -7,6 +7,8 @@ def printHelp():
     print("List of Aviliable Commands:")
     print("  -h, --help\t\tPrint this help")
     print("  -l, --list\t\tList aviliable serial ports")
+    print("  -f, --file\t\tExcute G-code File Passed in")
+    print("  -i\t\t\tEnter Interactive G-code Shell")
 
 def interactiveShell():
     try:
@@ -50,9 +52,9 @@ def main(argv):
         sys.exit(1)
 
     try:
-        opts, args = getopt.getopt(argv, "hli", ["help", "list"])
+        opts, args = getopt.getopt(argv, "hlif:", ["help", "list", "file="])
     except getopt.GetoptError:
-        print("Error unknown option\n")
+        print("Error unknown option, or missing argument\n")
         printHelp()
         sys.exit(1)
     
@@ -65,6 +67,11 @@ def main(argv):
                 print("  " + name)
         elif opt in ("-i"):
             interactiveShell()
+        elif opt in ("-f", "--file"):
+            f = open(arg)
+            for line in f.readlines():
+                ExcuteGCode(line)
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
