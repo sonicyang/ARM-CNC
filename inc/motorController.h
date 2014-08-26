@@ -17,16 +17,26 @@
 #define MOTOR_X_DIR_PIN 	5
 #define MOTOR_Y_STEP_PIN	6
 #define MOTOR_Y_DIR_PIN		7
+#define VECTOR_RB_SIZE	256
 #define MOVE_RB_SIZE 256
 
 typedef struct {
-	int8_t 	x;
-	int8_t	y;
+	int16_t x;
+	int16_t	y;
+	int8_t z;
+} VECTOR_T;
+
+typedef struct {
+	int8_t 	x:	3;
+	int8_t	y:	3;
+	int8_t  z: 	2;
 } MOVE_T;
 
 RINGBUFF_T movebuf;
+RINGBUFF_T vectorbuf;
 
 uint8_t	movebuf_base[MOVE_RB_SIZE];
+uint8_t	vectorbuf_base[MOVE_RB_SIZE];
 
 uint32_t xPosition, yPosition;
 
@@ -42,13 +52,16 @@ void DisableOutput(void);
 
 void SetSpeed(uint16_t rate);
 
+uint8_t addVector(int16_t x, int16_t y, int8_t z);
+
 uint8_t moveAbsolutly(int32_t x, int32_t y);
-uint8_t moveRelativly(int32_t x, int32_t y);
+uint8_t moveRelativly(int32_t x, int32_t y, int8_t z);
 
-uint8_t bufferHasEnoughRoom(int32_t x, int32_t y);
+uint8_t bufferHasEnoughRoom(int32_t x, int32_t y, int8_t z);
 
-void InsertMove(int8_t x, int8_t y);
+void InsertMove(int8_t x, int8_t y, int8_t z);
 void processMoves(void);
+void processVectors(void);
 
 
 #endif /* MOTORCONTROLLER_H_ */
