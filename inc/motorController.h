@@ -44,6 +44,8 @@ uint32_t feedrate;
 
 void motorControllerInit(void);
 
+void TIMER32_0_IRQHandler(void);
+
 void StepX(int8_t direction);
 void StepY(int8_t direction);
 

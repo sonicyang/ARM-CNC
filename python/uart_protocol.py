@@ -6,6 +6,7 @@ from threading import Thread
 import time
 import sys
 import glob
+import pdb
 
 class PACKET_T:
     def __init__(self):
@@ -95,13 +96,14 @@ def UART_Send_ECHO(num):
     
     txbuf.put(packet)
 
-def UART_Send_MOVE(x, y):
+def UART_Send_MOVE(x, y, z):
     global txbuf
 
     packet = PACKET_T()
     packet.command = MOVE 
     packet.data[0] = x
     packet.data[1] = y
+    packet.data[2] = z
     
     txbuf.put(packet)
 
@@ -164,6 +166,8 @@ def UARTTranciver(portname):
             packet = txbuf.get();
             packet.checksum = calculateCheckSum(packet)
             
+            print("Send", packet.command)
+
             ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, packet.transmissionNumber,\
                     packet.command, packet.data[0], packet.data[1], packet.data[2], packet.data[3], \
                     packet.data[4], packet.data[5], packet.data[6], packet.checksum))
@@ -184,14 +188,19 @@ def UARTTranciver(portname):
                         packet.transmissionNumber, packet.command, packet.data[0], packet.data[1], \
                         packet.data[2], packet.data[3], packet.data[4], packet.data[5], packet.data[6],\
                         packet.checksum = struct.unpack(PACKET_FMT, raw_data);
+                
+                print(packet.command)
 
                 if(packet.command == ACK):
+                    print("GOT ACK")
                     UART_ACK_FLAG = 1
                     UART_ACK_PENDING = 0
                 elif(packet.command == NAK):
+                    print("GOT NAK")
                     UART_NAK_FLAG = 1
                     UART_ACK_PENDING = 0
                 elif(packet.command == TAL):
+                    print("GOT TAL")
                     UART_TAL_FLAG = 1
                     UART_ACK_PENDING = 0
         

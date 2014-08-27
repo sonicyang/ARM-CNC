@@ -1,6 +1,6 @@
 from uart_protocol import *
 import math
-
+import pdb 
 ############################
 #   modified bt sonicyang  #
 ############################
@@ -27,11 +27,13 @@ from numpy import pi, sin, cos, sqrt, arccos, arcsin
 
 dx=0.2  #resolution in x direction. Unit: mm
 dy=0.2  #resolution in y direction. Unit: mm
+dz=1
 
 #speed=10  #unit=mm/sec=0.04in/sec
 
 curr_x_pos = 0
 curr_y_pos = 0
+curr_z_pos = 0
 
 ################################################################################################
 ################################################################################################
@@ -41,8 +43,9 @@ curr_y_pos = 0
 ################################################################################################
 ################################################################################################
 
-def XYposition(lines):
-    x_pos = y_pos = 0
+def XYZposition(lines):
+    lines += " "
+    x_pos = y_pos = z_pos = "NOMOVE"
     try:
         #given a movement command line, return the X Y position
         xchar_loc=lines.index('X') 
@@ -61,7 +64,17 @@ def XYposition(lines):
         y_pos=float(lines[ychar_loc+1:i])     
     except:
         pass
-    return x_pos,y_pos 
+
+    try:
+        zchar_loc=lines.index('Z') 
+        i=zchar_loc+1 
+        while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
+            i+=1 
+        z_pos=float(lines[zchar_loc+1:i])     
+    except:
+        pass
+
+    return x_pos, y_pos, z_pos
 
 def IJposition(lines):
     #given a G02 or G03 movement command line, return the I J position
@@ -79,21 +92,46 @@ def IJposition(lines):
 
     return i_pos,j_pos 
 
-def moveto(x_pos,y_pos):
+def moveto(x_pos, y_pos, z_pos):
     global curr_x_pos
     global curr_y_pos
+    global curr_z_pos
+    
 
-    x_pos -= curr_x_pos
-    y_pos -= curr_y_pos
+    if(x_pos != "NOMOVE"):
+        x_pos -= curr_x_pos
+        curr_x_pos += x_pos
+    else:
+        x_pos = int(0)
+
+    if(y_pos != "NOMOVE"):
+        y_pos -= curr_y_pos
+        curr_y_pos += y_pos
+    else:
+        y_pos = int(0)
+
+    if(z_pos != "NOMOVE"):
+        z_pos -= curr_z_pos
+        curr_z_pos += z_pos
+    else:
+        z_pos = int(0) 
 
     #Translate mm into machine blocks
     x_pos /= dx
     y_pos /= dy
+    z_pos /= dz
     
+    if(z_pos > 200):
+        z_pos = 200
+    elif(z_pos < -200):
+        z_pos = -200
+    
+    z_pos = int(z_pos)
+
     parts = math.ceil(max(abs(x_pos), abs(y_pos)) / 200)
     if parts < 1:
         parts = 1   #for 0,0 bug fix
-
+    
     x_pos /= parts
     y_pos /= parts
     
@@ -104,16 +142,17 @@ def moveto(x_pos,y_pos):
     y_pos = math.floor(y_pos)
 
     for i in range(parts):
-       #UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error)) 
+       UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error), z_pos) 
+       
+       print(x_pos, y_pos, z_pos)
        f = open("movement.txt", "a")
        f.write(str(x_pos + math.floor(i * x_error)))
        f.write("\t")
        f.write(str(y_pos + math.floor(i * y_error)))
+       f.write("\t")
+       f.write(str(z_pos))
        f.write("\n")
        f.close
-    
-    curr_x_pos += x_pos
-    curr_y_pos += y_pos
 
     return 
 
@@ -127,89 +166,79 @@ def moveto(x_pos,y_pos):
 
 def ExcuteGCode(lines):
     print(lines);
-    try:#read and execute G code
-        if lines==[]:
-            pass
-        elif lines[0:3]=='G90':
-            print("Absolute Positioning mode")
-            
-        elif lines[0:3]=='G20':# working in inch 
-            dx/=25.4 
-            dy/=25.4 
-            print('Working in inch')
-              
-        elif lines[0:3]=='G21':# working in mm 
-            print('Working in mm')   
-            
-        elif lines[0:3]=='M05':
-            GPIO.output(Laser_switch,False) 
-            print('Iron Deactivate')
-            
-        elif lines[0:3]=='M03':
-            GPIO.output(Laser_switch,True) 
-            print('Iron Activate')
-
-        elif lines[0:3]=='M02':
-            print('Finished!')
-
-        elif (lines[0:3]=='G1F')|(lines[0:4]=='G1 F'):
-            pass
-
-        elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
-            if lines[0:3]=="G0 ":
-        #        UART_Send_DEACTIVATE()
-                pass
-            else:
-        #        UART_Send_ACTIVATE()
-                pass
-
-            [x_pos,y_pos]=XYposition(lines) 
-            moveto(x_pos, y_pos) 
-            
-        elif (lines[0:3]=='G02')|(lines[0:3]=='G03'): #circular interpolation
-            old_x_pos=x_pos 
-            old_y_pos=y_pos 
-
-            [x_pos,y_pos]=XYposition(lines) 
-            [i_pos,j_pos]=IJposition(lines) 
-
-            xcenter=old_x_pos+i_pos    #center of the circle for interpolation
-            ycenter=old_y_pos+j_pos 
-            
-            
-            Dx=x_pos-xcenter 
-            Dy=y_pos-ycenter       #vector [Dx,Dy] points from the circle center to the new position
-            
-            r=sqrt(i_pos**2+j_pos**2)    # radius of the circle
-            
-            e1=[-i_pos,-j_pos]  #pointing from center to current position
-            if (lines[0:3]=='G02'): #clockwise
-                e2=[e1[1],-e1[0]]       #perpendicular to e1. e2 and e1 forms x-y system (clockwise)
-            else:                   #counterclockwise
-                e2=[-e1[1],e1[0]]       #perpendicular to e1. e1 and e2 forms x-y system (counterclockwise)
-
-            #[Dx,Dy]=e1*cos(theta)+e2*sin(theta), theta is the open angle
-
-            costheta=(Dx*e1[0]+Dy*e1[1])/r**2 
-            sintheta=(Dx*e2[0]+Dy*e2[1])/r**2         #theta is the angule spanned by the circular interpolation curve
-                
-            if costheta>1:  # there will always be some numerical errors! Make sure abs(costheta)<=1
-                costheta=1 
-            elif costheta<-1:
-                costheta=-1 
-
-            theta=arccos(costheta) 
-            if sintheta<0:
-                theta=2.0*pi-theta 
-
-            no_step=int(round(r*theta/dx/5.0))    # number of point for the circular interpolation
-            
-            for i in range(1,no_step+1):
-                tmp_theta=i*theta/no_step 
-                tmp_x_pos=xcenter+e1[0]*cos(tmp_theta)+e2[0]*sin(tmp_theta) 
-                tmp_y_pos=ycenter+e1[1]*cos(tmp_theta)+e2[1]*sin(tmp_theta) 
-                moveto(tmp_x_pos,tmp_y_pos) 
+    if lines==[]:
+        pass
+    elif lines[0:3]=='G90':
+        print("Absolute Positioning mode")
         
-    except KeyboardInterrupt:
+    elif lines[0:3]=='G20':# working in inch 
+        dx/=25.4 
+        dy/=25.4 
+        print('Working in inch')
+          
+    elif lines[0:3]=='G21':# working in mm 
+        print('Working in mm')   
+        
+    elif lines[0:3]=='M05':
+        GPIO.output(Laser_switch,False) 
+        print('Iron Deactivate')
+        
+    elif lines[0:3]=='M03':
+        GPIO.output(Laser_switch,True) 
+        print('Iron Activate')
+
+    elif lines[0:3]=='M02':
+        print('Finished!')
+
+    elif (lines[0:3]=='G1F')|(lines[0:4]=='G1 F'):
         pass
 
+    elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
+        
+        [x_pos, y_pos, z_pos]=XYZposition(lines)
+        print(x_pos, y_pos, z_pos)
+        moveto(x_pos, y_pos, z_pos) 
+        
+    elif (lines[0:3]=='G02')|(lines[0:3]=='G03'): #circular interpolation
+        old_x_pos=x_pos 
+        old_y_pos=y_pos 
+
+        [x_pos,y_pos]=XYposition(lines) 
+        [i_pos,j_pos]=IJposition(lines) 
+
+        xcenter=old_x_pos+i_pos    #center of the circle for interpolation
+        ycenter=old_y_pos+j_pos 
+        
+        
+        Dx=x_pos-xcenter 
+        Dy=y_pos-ycenter       #vector [Dx,Dy] points from the circle center to the new position
+        
+        r=sqrt(i_pos**2+j_pos**2)    # radius of the circle
+        
+        e1=[-i_pos,-j_pos]  #pointing from center to current position
+        if (lines[0:3]=='G02'): #clockwise
+            e2=[e1[1],-e1[0]]       #perpendicular to e1. e2 and e1 forms x-y system (clockwise)
+        else:                   #counterclockwise
+            e2=[-e1[1],e1[0]]       #perpendicular to e1. e1 and e2 forms x-y system (counterclockwise)
+
+        #[Dx,Dy]=e1*cos(theta)+e2*sin(theta), theta is the open angle
+
+        costheta=(Dx*e1[0]+Dy*e1[1])/r**2 
+        sintheta=(Dx*e2[0]+Dy*e2[1])/r**2         #theta is the angule spanned by the circular interpolation curve
+            
+        if costheta>1:  # there will always be some numerical errors! Make sure abs(costheta)<=1
+            costheta=1 
+        elif costheta<-1:
+            costheta=-1 
+
+        theta=arccos(costheta) 
+        if sintheta<0:
+            theta=2.0*pi-theta 
+
+        no_step=int(round(r*theta/dx/5.0))    # number of point for the circular interpolation
+        
+        for i in range(1,no_step+1):
+            tmp_theta=i*theta/no_step 
+            tmp_x_pos=xcenter+e1[0]*cos(tmp_theta)+e2[0]*sin(tmp_theta) 
+            tmp_y_pos=ycenter+e1[1]*cos(tmp_theta)+e2[1]*sin(tmp_theta) 
+            moveto(tmp_x_pos,tmp_y_pos) 

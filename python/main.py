@@ -36,7 +36,10 @@ def interactiveShell():
         command = ""
         while(command != "stop"):
             command = input(">")
-            ExcuteGCode(command)
+            if(command != "ECHO"):
+                ExcuteGCode(command)
+            else:
+                UART_Send_ECHO(0x1A)
 
         UART_DeInit()
     except KeyboardInterrupt:
@@ -68,6 +71,9 @@ def main(argv):
         elif opt in ("-i"):
             interactiveShell()
         elif opt in ("-f", "--file"):
+            name = input("\nPort Name : ")
+
+            UART_Init(name)
             f = open(arg)
             for line in f.readlines():
                 ExcuteGCode(line)

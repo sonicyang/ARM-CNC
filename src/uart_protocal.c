@@ -133,17 +133,15 @@ void processUART_Receive(void){
 						UART_TAL_FLAG = FALSE;
 						break;
 					case MOVE:
-						if(addVector(data.data[0], data.data[2]))
+						if(addVector(data.data[0], data.data[1], data.data[2]))
 							SendTAL();
 						else
 							SendACK();
 						break;
 					case ACTIVE:
-
 						SendACK();
 						break;
 					case DEACTIVE:
-
 						SendACK();
 						break;
 					case ACK:

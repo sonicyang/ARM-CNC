@@ -20,7 +20,7 @@
 #include "motorController.h"
 #include "timer.h"
 
-uint32_t UART_REVEICE_FLAG, UART_TRANSMIT_FLAG, VECTOR_PROCESS_FLAG;
+uint32_t UART_REVEICE_FLAG, UART_TRANSMIT_FLAG, VECTOR_PROCESS_FLAG, MOVEMENT_PROCESS_FLAG;
 
 int main(void) {
 
@@ -37,29 +37,31 @@ int main(void) {
     UART_init();
     motorControllerInit();
 
-    startTimer(20, &UART_REVEICE_FLAG);
-    startTimer(30, &UART_TRANSMIT_FLAG);
-    startTimer(15, &VECTOR_PROCESS_FLAG);
+    startTimer(13, &UART_REVEICE_FLAG);
+    startTimer(23, &UART_TRANSMIT_FLAG);
+    startTimer(17, &VECTOR_PROCESS_FLAG);
+    //startTimer(10, &MOVEMENT_PROCESS_FLAG);
 
     while(1) {
     	if(UART_REVEICE_FLAG){
     		processUART_Receive();
-    		startTimer(20, &UART_REVEICE_FLAG);
+    		startTimer(13, &UART_REVEICE_FLAG);
     	}
 
     	if(UART_TRANSMIT_FLAG){
     		processUART_Transmit();
-    		startTimer(20, &UART_TRANSMIT_FLAG);
+    		startTimer(23, &UART_TRANSMIT_FLAG);
     	}
 
     	if(VECTOR_PROCESS_FLAG){
     		processVectors();
-    		startTimer(1, &VECTOR_PROCESS_FLAG);
+    		startTimer(17, &VECTOR_PROCESS_FLAG);
     	}
 
-    	if(!(UART_REVEICE_FLAG || UART_TRANSMIT_FLAG|| VECTOR_PROCESS_FLAG)){
+    	/*if(MOVEMENT_PROCESS_FLAG){
     		processMoves();
-    	}
+    		startTimer(1, &MOVEMENT_PROCESS_FLAG);
+    	}*/
 
     }
     return 0 ;
