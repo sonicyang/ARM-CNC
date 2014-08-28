@@ -13,11 +13,11 @@ class PACKET_T:
         self.magicNumber = [0xAA, 0xAA, 0xAA]
         self.transmissionNumber = 0
         self.command = 0
-        self.data = [0] * 7 
+        self.data = [0] * 3 
         self.checksum = 0
 
-PACKET_FMT = "<3BBH7hB"   #packet formant
-PACKET_SIZE = 21
+PACKET_FMT = "<3BB3hB"   #packet formant
+PACKET_SIZE = 11 
 
 IDLE    = 1
 MOVE    = 2   
@@ -28,7 +28,7 @@ NAK     = 6
 TAL     = 7
 ECHO    = 8
 
-MAX_TRY_COUNT = 20
+MAX_TRY_COUNT = 2000000000000
 
 global SystemRunning
 
@@ -84,6 +84,10 @@ def UART_Init(portname):
 
 def UART_DeInit():
     global SystemRunning
+    
+    while(not (txbuf.empty())):
+        pass
+
     SystemRunning = 0
     UARTTranciverThread.join()
 
@@ -123,9 +127,8 @@ def UART_Send_DEACTIVATE():
     
     txbuf.put(packet)
 def calculateCheckSum(packet):
-    chksum = (packet.transmissionNumber + packet.command \
-            + packet.data[0] + packet.data[1] + packet.data[2] + packet.data[3] \
-            + packet.data[4] +  packet.data[5] +  packet.data[6])
+    chksum = (packet.command \
+            + packet.data[0] + packet.data[1] + packet.data[2]) 
     return (((chksum >> 8) + chksum)) & 0xFF
 
 def UARTTranciver(portname):
@@ -134,6 +137,7 @@ def UARTTranciver(portname):
     global rxbuf
 
     Timeout_Count = 0
+    Timeout_Amount = 0.1
 
     UART_ACK_FLAG = 1
     UART_NAK_FLAG = 0
@@ -144,21 +148,20 @@ def UARTTranciver(portname):
     repeat_buf = PACKET_T()
     target_time = time.time()
 
-    ser = serial.Serial(portname, 115200, timeout=0.2) # 200ms
+    ser = serial.Serial(portname, 115200, timeout=0)
     
-    while(SystemRunning):
+    while(SystemRunning or UART_ACK_PENDING):
 
         if(UART_TAL_FLAG):
             time.sleep(2)
 
         if(UART_NAK_FLAG or UART_TIMEOUT_FLAG or UART_TAL_FLAG):
-            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.transmissionNumber,\
-                    repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.data[3], \
-                    repeat_buf.data[4], repeat_buf.data[5], repeat_buf.data[6], repeat_buf.checksum))
-
+            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.checksum))
+            
+            print("ReSend", repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1])
             
             UART_ACK_PENDING = 1
-            target_time = time.time() + 0.5
+            target_time = time.time() + Timeout_Amount
 
             UART_NAK_FLAG = UART_TIMEOUT_FLAG = UART_TAL_FLAG = 0
 
@@ -166,43 +169,55 @@ def UARTTranciver(portname):
             packet = txbuf.get();
             packet.checksum = calculateCheckSum(packet)
             
-            print("Send", packet.command)
-
-            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, packet.transmissionNumber,\
-                    packet.command, packet.data[0], packet.data[1], packet.data[2], packet.data[3], \
-                    packet.data[4], packet.data[5], packet.data[6], packet.checksum))
-
             repeat_buf = packet
 
-            UART_ACK_PENDING = 1
-            target_time = time.time() + 0.5
+            print("Send", packet.command, packet.data[0], packet.data[1])
 
-            UART_ACK_FLAG = 0
+            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.checksum))
+            ser.flush()
+
+            UART_ACK_PENDING = 1
+            target_time = time.time() + Timeout_Amount
+            UART_ACK_FLAG = 0 
 
         if(not rxbuf.full()):
             raw_data = ser.read(PACKET_SIZE);
-            if(len(raw_data) >= 21):
+            for by in raw_data:
+                rxbuf.put(by);
 
-                packet = PACKET_T()
-                packet.magicNumber[0], packet.magicNumber[1], packet.magicNumber[2],\
-                        packet.transmissionNumber, packet.command, packet.data[0], packet.data[1], \
-                        packet.data[2], packet.data[3], packet.data[4], packet.data[5], packet.data[6],\
-                        packet.checksum = struct.unpack(PACKET_FMT, raw_data);
-                
-                print(packet.command)
+        while(rxbuf.qsize() >= PACKET_SIZE):
+                        
+            if((rxbuf.queue[0] != 0xAA) or (rxbuf.queue[1] != 0xAA) or (rxbuf.queue[2] != 0xAA)):
+                rxbuf.get()
+                continue
 
-                if(packet.command == ACK):
-                    print("GOT ACK")
-                    UART_ACK_FLAG = 1
-                    UART_ACK_PENDING = 0
-                elif(packet.command == NAK):
-                    print("GOT NAK")
-                    UART_NAK_FLAG = 1
-                    UART_ACK_PENDING = 0
-                elif(packet.command == TAL):
-                    print("GOT TAL")
-                    UART_TAL_FLAG = 1
-                    UART_ACK_PENDING = 0
+            raw_data = bytearray()
+            for i in range(0, PACKET_SIZE):
+                raw_data.append(rxbuf.get())
+
+            packet = PACKET_T()
+            packet.magicNumber[0], packet.magicNumber[1], packet.magicNumber[2],\
+                    packet.command, packet.data[0], packet.data[1], \
+                    packet.data[2],\
+                    packet.checksum = struct.unpack(PACKET_FMT, raw_data);
+            
+            if(calculateCheckSum(packet) != packet.checksum):
+                continue
+
+            if(packet.command == ACK):
+                print("GOT ACK")
+                UART_ACK_FLAG = 1
+                UART_ACK_PENDING = 0
+            elif(packet.command == NAK):
+                print("GOT NAK")
+                UART_NAK_FLAG = 1
+                UART_ACK_PENDING = 0
+            elif(packet.command == TAL):
+                print("GOT TAL")
+                UART_TAL_FLAG = 1
+                UART_ACK_PENDING = 0
+            else:
+                print("TRASH!")
         
         if(((time.time() >= target_time)) and UART_ACK_PENDING):
             UART_TIMEOUT_FLAG = 1

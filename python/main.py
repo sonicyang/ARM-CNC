@@ -10,9 +10,9 @@ def printHelp():
     print("  -f, --file\t\tExcute G-code File Passed in")
     print("  -i\t\t\tEnter Interactive G-code Shell")
 
+
 def interactiveShell():
     try:
-
         print("Welcome to the Interactive Shell")
         print("Please choose serial port the CNC machine is connected to\n")
         print("List of Serial Ports : ")
@@ -21,32 +21,48 @@ def interactiveShell():
 
         name = input("\nPort Name : ")
         
-        print("\nList of Aviliable Commands:")
-        print("  G00 G01    Linear Movement")
-        print("  G02 G03    Circle Movement")
-        print("  M03        Activate Iron")
-        print("  M05        Deactivate Iron")
-        print("  G20        Set Unit in inchs")
-        print("  G21        Set Unit in mm")
-        print("  stop       Quit Interactive Shell")
-        print("\n")
+        printGCodeHelp();
 
         UART_Init(name)
 
         command = ""
-        while(command != "stop"):
+        while(command != "M100"):
             command = input(">")
-            if(command != "ECHO"):
-                ExcuteGCode(command)
-            else:
+            if(command == "ECHO"):
                 UART_Send_ECHO(0x1A)
-
+            else:
+                ExcuteGCode(command)
         UART_DeInit()
     except KeyboardInterrupt:
-        pass
+        print("\nBye")
+        try:
+            UART_DeInit()
+        except:
+            pass
 
-def limitMovement(x, y):
-    pass
+def execFile(filename):
+    try:
+
+        print("Excuting G-Code File")
+        print("Please choose serial port the CNC machine is connected to\n")
+        print("List of Serial Ports : ")
+        for name in UART_ListPorts():
+            print("  " + name)
+
+        name = input("\nPort Name : ")
+        
+        UART_Init(name)
+        f = open(filename)
+        for line in f.readlines():
+            ExcuteGCode(line)
+        UART_DeInit()
+
+    except KeyboardInterrupt:
+        print("\nG-Code Excution Terminated")
+        try:
+            UART_DeInit()
+        except:
+            pass
 
 def main(argv):
     if len(argv) < 1:
@@ -71,12 +87,7 @@ def main(argv):
         elif opt in ("-i"):
             interactiveShell()
         elif opt in ("-f", "--file"):
-            name = input("\nPort Name : ")
-
-            UART_Init(name)
-            f = open(arg)
-            for line in f.readlines():
-                ExcuteGCode(line)
+            execFile(arg)
 
 
 if __name__ == "__main__":

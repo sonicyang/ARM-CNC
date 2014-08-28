@@ -65,5 +65,7 @@ void InsertMove(int8_t x, int8_t y, int8_t z);
 void processMoves(void);
 void processVectors(void);
 
+void i2c_pump(I2C_XFER_T *xfer, uint8_t ops);
+
 
 #endif /* MOTORCONTROLLER_H_ */

@@ -29,11 +29,21 @@ dx=0.2  #resolution in x direction. Unit: mm
 dy=0.2  #resolution in y direction. Unit: mm
 dz=1
 
+mmdx = dx
+mmdy = dy
+
+indx = dx / 2.54
+indy = dy / 2.54
+
 #speed=10  #unit=mm/sec=0.04in/sec
 
 curr_x_pos = 0
 curr_y_pos = 0
-curr_z_pos = 0
+
+abs_mode = 1
+
+offset_x_pos = 0
+offset_y_pos = 0
 
 ################################################################################################
 ################################################################################################
@@ -99,34 +109,30 @@ def moveto(x_pos, y_pos, z_pos):
     
 
     if(x_pos != "NOMOVE"):
-        x_pos -= curr_x_pos
+        if abs_mode:
+            x_pos -= curr_x_pos
         curr_x_pos += x_pos
     else:
         x_pos = int(0)
 
     if(y_pos != "NOMOVE"):
-        y_pos -= curr_y_pos
+        if abs_mode:
+            y_pos -= curr_y_pos
         curr_y_pos += y_pos
     else:
         y_pos = int(0)
 
     if(z_pos != "NOMOVE"):
-        z_pos -= curr_z_pos
-        curr_z_pos += z_pos
+        if z_pos > 0:
+            z_pos = 1
+        elif z_pos < 0:
+            z_pos = -1
     else:
         z_pos = int(0) 
 
     #Translate mm into machine blocks
     x_pos /= dx
     y_pos /= dy
-    z_pos /= dz
-    
-    if(z_pos > 200):
-        z_pos = 200
-    elif(z_pos < -200):
-        z_pos = -200
-    
-    z_pos = int(z_pos)
 
     parts = math.ceil(max(abs(x_pos), abs(y_pos)) / 200)
     if parts < 1:
@@ -143,16 +149,6 @@ def moveto(x_pos, y_pos, z_pos):
 
     for i in range(parts):
        UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error), z_pos) 
-       
-       print(x_pos, y_pos, z_pos)
-       f = open("movement.txt", "a")
-       f.write(str(x_pos + math.floor(i * x_error)))
-       f.write("\t")
-       f.write(str(y_pos + math.floor(i * y_error)))
-       f.write("\t")
-       f.write(str(z_pos))
-       f.write("\n")
-       f.close
 
     return 
 
@@ -164,28 +160,50 @@ def moveto(x_pos, y_pos, z_pos):
 ###########################################################################################
 ###########################################################################################
 
+def printGCodeHelp():
+    print("\nList of Aviliable Commands:")
+    print("  G00 G01    Linear Movement")
+    print("  G02 G03    Circle Movement")
+    print("  G20        Set Unit in inchs")
+    print("  G21        Set Unit in mm")
+    print("  G90        Absolute Positioning Mode")
+    print("  G91        Incremental Positioning Mode")
+    print("  G92        Set Logical Origin Point")
+    print("  M02        Quit Interactive Shell")
+    print("  M100       Print Help Message")
+    print("\n")
+
 def ExcuteGCode(lines):
-    print(lines);
+    global dx, dy, abs_mode, curr_x_pos, curr_y_pos
+
     if lines==[]:
         pass
     elif lines[0:3]=='G90':
+        abs_mode = 1
         print("Absolute Positioning mode")
         
+    elif lines[0:3]=='G91':
+        abs_moce = 0
+        print("Incremental Positioning mode")
+
+    elif lines[0:3]=='G92':
+        [x_pos, y_pos, z_pos]=XYZposition(lines)
+
+        curr_x_pos = 0
+        curr_y_pos = 0
+        print("Setting Logical Orin Point to ", curr_x_pos, curr_y_pos)
+
     elif lines[0:3]=='G20':# working in inch 
-        dx/=25.4 
-        dy/=25.4 
+        dx = indx
+        dy = indy
         print('Working in inch')
           
     elif lines[0:3]=='G21':# working in mm 
-        print('Working in mm')   
-        
-    elif lines[0:3]=='M05':
-        GPIO.output(Laser_switch,False) 
-        print('Iron Deactivate')
-        
-    elif lines[0:3]=='M03':
-        GPIO.output(Laser_switch,True) 
-        print('Iron Activate')
+        dx = mmdx
+        dy = mmdy
+        print('Working in mm')  
+    elif lines[0:4] == "M100":
+        printGCodeHelp()
 
     elif lines[0:3]=='M02':
         print('Finished!')
@@ -193,15 +211,18 @@ def ExcuteGCode(lines):
     elif (lines[0:3]=='G1F')|(lines[0:4]=='G1 F'):
         pass
 
-    elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
+    elif (lines[0]=='F'):
+        pass # get speed and set it here
+
+    elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0:3]=='G00')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
         
         [x_pos, y_pos, z_pos]=XYZposition(lines)
-        print(x_pos, y_pos, z_pos)
-        moveto(x_pos, y_pos, z_pos) 
+        moveto(x_pos, y_pos, z_pos)
+        print("Moving to ", x_pos, y_pos, z_pos)
         
     elif (lines[0:3]=='G02')|(lines[0:3]=='G03'): #circular interpolation
-        old_x_pos=x_pos 
-        old_y_pos=y_pos 
+        old_x_pos=curr_x_pos 
+        old_y_pos=curr_y_pos 
 
         [x_pos,y_pos]=XYposition(lines) 
         [i_pos,j_pos]=IJposition(lines) 

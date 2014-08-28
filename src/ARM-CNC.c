@@ -37,15 +37,18 @@ int main(void) {
     UART_init();
     motorControllerInit();
 
-    startTimer(13, &UART_REVEICE_FLAG);
+
+
+    startTimer(5, &UART_REVEICE_FLAG);
     startTimer(23, &UART_TRANSMIT_FLAG);
     startTimer(17, &VECTOR_PROCESS_FLAG);
     //startTimer(10, &MOVEMENT_PROCESS_FLAG);
 
     while(1) {
+    	processUART_Receive();
     	if(UART_REVEICE_FLAG){
-    		processUART_Receive();
-    		startTimer(13, &UART_REVEICE_FLAG);
+
+    		startTimer(5, &UART_REVEICE_FLAG);
     	}
 
     	if(UART_TRANSMIT_FLAG){
@@ -53,10 +56,9 @@ int main(void) {
     		startTimer(23, &UART_TRANSMIT_FLAG);
     	}
 
-    	if(VECTOR_PROCESS_FLAG){
-    		processVectors();
-    		startTimer(17, &VECTOR_PROCESS_FLAG);
-    	}
+
+    	processVectors();
+
 
     	/*if(MOVEMENT_PROCESS_FLAG){
     		processMoves();

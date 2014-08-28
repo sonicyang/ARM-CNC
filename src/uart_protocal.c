@@ -36,7 +36,7 @@ void UART_init(void){
 
 	/* Enable receive data and line status interrupt, the transmit interrupt
 	   is handled by the driver. */
-	Chip_UART_IntEnable(LPC_USART, (UART_IER_RBRINT | UART_IER_RLSINT));
+	Chip_UART_IntEnable(LPC_USART, (UART_IER_RBRINT | UART_IER_RLSINT | UART_IER_THREINT));
 
 	/* preemption = 1, sub-priority = 1 */
 	NVIC_SetPriority(UART0_IRQn, 1);
@@ -54,7 +54,6 @@ uint8_t isChecksumVaild(PACKET_T* pak){
 	uint8_t i;
 	uint16_t chk = 0;
 
-	chk += pak->transmissionNumber;
 	chk += pak->command;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
@@ -70,7 +69,6 @@ void generateCheckSum(PACKET_T* pak){
 	uint8_t i;
 	uint16_t chk = 0;
 
-	chk += pak->transmissionNumber;
 	chk += pak->command;
 	for(i = 0; i < DATA_SIZE; i++)
 		chk +=pak->data[i];
@@ -95,8 +93,10 @@ void SendACK(void){
 	generateHeader(&response);
 	response.command = ACK;
 	generateCheckSum(&response);
-	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
+	while(RingBuffer_GetFree(&txbuf) < PACKET_SIZE);	//Make Sure this is sent
+	//Chip_UART_IntEnable(LPC_USART, UART_IER_THREINT);
+	//RingBuffer_InsertMult(&txbuf, &response, PACKET_SIZE);
+	Chip_UART_SendRB(LPC_USART, &txbuf, &response, PACKET_SIZE);
 }
 
 void SendNAK(void){
@@ -104,8 +104,10 @@ void SendNAK(void){
 	generateHeader(&response);
 	response.command = NAK;
 	generateCheckSum(&response);
-	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
+	while(RingBuffer_GetFree(&txbuf) < PACKET_SIZE);	//Make Sure this is sent
+	//Chip_UART_IntEnable(LPC_USART, UART_IER_THREINT);
+	//RingBuffer_InsertMult(&txbuf, &response, PACKET_SIZE);
+	Chip_UART_SendRB(LPC_USART, &txbuf, &response, PACKET_SIZE);
 }
 
 void SendTAL(void){
@@ -113,19 +115,21 @@ void SendTAL(void){
 	generateHeader(&response);
 	response.command = TAL;
 	generateCheckSum(&response);
-	while(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T));	//Make Sure this is sent
-	Chip_UART_SendRB(LPC_USART, &txbuf, &response, sizeof(PACKET_T));
+	while(RingBuffer_GetFree(&txbuf) < PACKET_SIZE);	//Make Sure this is sent
+	//Chip_UART_IntEnable(LPC_USART, UART_IER_THREINT);
+	//RingBuffer_InsertMult(&txbuf, &response, PACKET_SIZE);
+	Chip_UART_SendRB(LPC_USART, &txbuf, &response, PACKET_SIZE);
 }
 
 void processUART_Receive(void){
-
-	while(RingBuffer_GetCount(&rxbuf) >= sizeof(PACKET_T)){
+	uint32_t x = RingBuffer_GetCount(&rxbuf);
+	while(RingBuffer_GetCount(&rxbuf) >= PACKET_SIZE){
 		uint8_t trash;	//Popping trash away
 
 		if(isPacketStart()){
 			PACKET_T data;
 
-			RingBuffer_PopMult(&rxbuf, &data, sizeof(PACKET_T));
+			RingBuffer_PopMult(&rxbuf, &data, PACKET_SIZE);
 
 			if(isChecksumVaild(&data)){
 				switch(data.command){
@@ -133,10 +137,13 @@ void processUART_Receive(void){
 						UART_TAL_FLAG = FALSE;
 						break;
 					case MOVE:
-						if(addVector(data.data[0], data.data[1], data.data[2]))
+						if(RingBuffer_IsFull(&vectorbuf)){
 							SendTAL();
-						else
+						}else{
 							SendACK();
+							addVector(data.data[0], data.data[1], data.data[2]);
+							//printf("ACKED %d %d \n", data.data[0], data.data[1]);
+						}
 						break;
 					case ACTIVE:
 						SendACK();
@@ -175,14 +182,14 @@ void processUART_Transmit(void){
 	if(UART_TAL_FLAG)
 		return;
 
-	if(RingBuffer_GetFree(&txbuf) < sizeof(PACKET_T))
+	if(RingBuffer_GetFree(&txbuf) < PACKET_SIZE)
 		return;
 
 	if(UART_ACK_FLAG){
 		if(RingBuffer_GetCount(&tpktbuf) > 0){
 			RingBuffer_Pop(&tpktbuf, &repeatBuf);
 
-			Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, sizeof(PACKET_T));
+			Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, PACKET_SIZE);
 
 			startTimer(500, &UART_TIMEOUT_FLAG);	//500ms
 			UART_ACK_FLAG = FALSE;
@@ -191,7 +198,7 @@ void processUART_Transmit(void){
 	}
 
 	if(UART_TIMEOUT_FLAG || UART_NAK_FLAG){
-		Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, sizeof(PACKET_T));
+		Chip_UART_SendRB(LPC_USART, &txbuf, &repeatBuf, PACKET_SIZE);
 		startTimer(500, &UART_TIMEOUT_FLAG);	//500ms
 		UART_NAK_FLAG  = UART_TIMEOUT_FLAG = FALSE;
 		return;
