@@ -137,16 +137,17 @@ void processUART_Receive(void){
 						UART_TAL_FLAG = FALSE;
 						break;
 					case MOVE:
-						if(RingBuffer_IsFull(&vectorbuf)){
+						if(vbufCount == 30){
 							SendTAL();
 						}else{
 							SendACK();
-							addVector(data.data[0], data.data[1], data.data[2]);
-							//printf("ACKED %d %d \n", data.data[0], data.data[1]);
+							addVector(data.data[0], data.data[1], data.data[2], data.data[3]);
+							//printf("ACKED %d %d %d %d\n", data.data[0], data.data[1], data.data[2], data.data[3]);
 						}
 						break;
-					case ACTIVE:
+					case SPEEDSET:
 						SendACK();
+						//SetSpeed(data.data[0]);
 						break;
 					case DEACTIVE:
 						SendACK();

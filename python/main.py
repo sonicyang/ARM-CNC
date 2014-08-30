@@ -2,6 +2,28 @@ from uart_protocol import *
 from gcodeinter import *
 import sys, getopt
 import pdb
+import argparse
+
+def chooseSerial():
+    print("Welcome to the Interactive Shell")
+    print("Please choose serial port the CNC machine is connected to\n")
+    print("List of Serial Ports : ")
+    i = 1
+    for name in UART_ListPorts():
+        print(i, "  " + name)
+        i += 1
+
+    pid = int(input("\nPort ID : "))
+    
+    if pid < 1 or pid > i:
+        raise "Error Out of Range"
+    
+    i = 1
+    for name in UART_ListPorts():
+        if i == pid:
+            return name
+        i += 1
+
 
 def printHelp():
     print("List of Aviliable Commands:")
@@ -10,17 +32,10 @@ def printHelp():
     print("  -f, --file\t\tExcute G-code File Passed in")
     print("  -i\t\t\tEnter Interactive G-code Shell")
 
-
 def interactiveShell():
     try:
-        print("Welcome to the Interactive Shell")
-        print("Please choose serial port the CNC machine is connected to\n")
-        print("List of Serial Ports : ")
-        for name in UART_ListPorts():
-            print("  " + name)
+        name = chooseSerial()
 
-        name = input("\nPort Name : ")
-        
         printGCodeHelp();
 
         UART_Init(name)
@@ -42,14 +57,7 @@ def interactiveShell():
 
 def execFile(filename):
     try:
-
-        print("Excuting G-Code File")
-        print("Please choose serial port the CNC machine is connected to\n")
-        print("List of Serial Ports : ")
-        for name in UART_ListPorts():
-            print("  " + name)
-
-        name = input("\nPort Name : ")
+        name = chooseSerial()
         
         UART_Init(name)
         f = open(filename)
@@ -88,6 +96,7 @@ def main(argv):
             interactiveShell()
         elif opt in ("-f", "--file"):
             execFile(arg)
+            print("\nJob Done\n")
 
 
 if __name__ == "__main__":

@@ -53,9 +53,9 @@ offset_y_pos = 0
 ################################################################################################
 ################################################################################################
 
-def XYZposition(lines):
+def XYZFposition(lines):
     lines += " "
-    x_pos = y_pos = z_pos = "NOMOVE"
+    x_pos = y_pos = z_pos = feedrate = "NOMOVE"
     try:
         #given a movement command line, return the X Y position
         xchar_loc=lines.index('X') 
@@ -80,11 +80,20 @@ def XYZposition(lines):
         i=zchar_loc+1 
         while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
             i+=1 
-        z_pos=float(lines[zchar_loc+1:i])     
+        z_pos=(-1) * float(lines[zchar_loc+1:i])     
+    except:
+        pass
+    
+    try:
+        fchar_loc=lines.index('F') 
+        i=fchar_loc+1 
+        while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
+            i+=1 
+        feedrate=float(lines[fchar_loc+1:i])     
     except:
         pass
 
-    return x_pos, y_pos, z_pos
+    return x_pos, y_pos, z_pos, feedrate
 
 def IJposition(lines):
     #given a G02 or G03 movement command line, return the I J position
@@ -102,7 +111,7 @@ def IJposition(lines):
 
     return i_pos,j_pos 
 
-def moveto(x_pos, y_pos, z_pos):
+def moveto(x_pos, y_pos, z_pos, feedrate):
     global curr_x_pos
     global curr_y_pos
     global curr_z_pos
@@ -129,6 +138,12 @@ def moveto(x_pos, y_pos, z_pos):
             z_pos = -1
     else:
         z_pos = int(0) 
+    
+    if(feedrate == "NOMOVE"):
+       feedrate = 0 
+    
+    feedrate /= dx;
+    feedrate *= 2;
 
     #Translate mm into machine blocks
     x_pos /= dx
@@ -146,9 +161,10 @@ def moveto(x_pos, y_pos, z_pos):
 
     x_pos = math.floor(x_pos) 
     y_pos = math.floor(y_pos)
+    
 
     for i in range(parts):
-       UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error), z_pos) 
+       UART_Send_MOVE(x_pos + math.floor(i * x_error), y_pos + math.floor(i * y_error), z_pos, feedrate) 
 
     return 
 
@@ -178,6 +194,8 @@ def ExcuteGCode(lines):
 
     if lines==[]:
         pass
+    elif lines[0:3] == "G04":
+        time.sleep(2); 
     elif lines[0:3]=='G90':
         abs_mode = 1
         print("Absolute Positioning mode")
@@ -187,11 +205,9 @@ def ExcuteGCode(lines):
         print("Incremental Positioning mode")
 
     elif lines[0:3]=='G92':
-        [x_pos, y_pos, z_pos]=XYZposition(lines)
-
         curr_x_pos = 0
         curr_y_pos = 0
-        print("Setting Logical Orin Point to ", curr_x_pos, curr_y_pos)
+        print("Setting Logical Orin Point to Current Point")
 
     elif lines[0:3]=='G20':# working in inch 
         dx = indx
@@ -212,13 +228,15 @@ def ExcuteGCode(lines):
         pass
 
     elif (lines[0]=='F'):
-        pass # get speed and set it here
+
+        [x_pos, y_pos, z_pos, feedrate]=XYZFposition(lines)
+        moveto(x_pos, y_pos, z_pos, feedrate)
 
     elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0:3]=='G00')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
         
-        [x_pos, y_pos, z_pos]=XYZposition(lines)
-        moveto(x_pos, y_pos, z_pos)
-        print("Moving to ", x_pos, y_pos, z_pos)
+        [x_pos, y_pos, z_pos, feedrate]=XYZFposition(lines)
+        moveto(x_pos, y_pos, z_pos, feedrate)
+        print("Moving to ", x_pos, y_pos, z_pos, feedrate)
         
     elif (lines[0:3]=='G02')|(lines[0:3]=='G03'): #circular interpolation
         old_x_pos=curr_x_pos 

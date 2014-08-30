@@ -14,8 +14,8 @@
 
 #define UART_RB_SIZE 256
 #define UART_TRANSMIT_RB_SIZE 16
-#define	DATA_SIZE 3
-#define PACKET_SIZE 11
+#define	DATA_SIZE 4
+#define PACKET_SIZE 13
 
 RINGBUFF_T txbuf, rxbuf, tpktbuf;
 
@@ -31,7 +31,7 @@ typedef struct {
 enum{
 	IDLE = 1,
 	MOVE,
-	ACTIVE,
+	SPEEDSET,
 	DEACTIVE,
 	ACK,
 	NAK,

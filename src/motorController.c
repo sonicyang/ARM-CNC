@@ -10,7 +10,7 @@
 #include "ring_buffer.h"
 #include "i2c.h"
 
-#define Pressure 300
+#define Pressure 700
 
 #define SPEED_100KHZ         100000
 
@@ -26,8 +26,10 @@ extern volatile uint32_t I2CReadLength, I2CWriteLength;
 void motorControllerInit(void){
 	uint32_t timerFreq;
 
-	RingBuffer_Init(&movebuf, movebuf_base, sizeof(MOVE_T), MOVE_RB_SIZE);
-	RingBuffer_Init(&vectorbuf, vectorbuf_base, sizeof(VECTOR_T), VECTOR_RB_SIZE * sizeof(VECTOR_T));
+	RingBuffer_Init(&movebuf, movebuf_base, sizeof(MOVE_T), MOVE_RB_SIZE / sizeof(MOVE_T));
+	//RingBuffer_Init(&vectorbuf, vectorbuf_base, sizeof(VECTOR_T), VECTOR_RB_SIZE / sizeof(VECTOR_T));
+
+	vbufH = vbufT = vbufCount = 0;
 
 	xPosition = yPosition = 0;
 
@@ -41,7 +43,6 @@ void motorControllerInit(void){
 		while ( 1 );				/* Fatal error */
 	  }
 
-	feedrate = 20;
 
 	/* Init a Time for Motor Controller Use */
 	Chip_TIMER_Init(LPC_TIMER32_0);
@@ -59,7 +60,7 @@ void motorControllerInit(void){
 	Chip_TIMER_Enable(LPC_TIMER32_0);
 
 	/* Enable timer interrupt */
-	NVIC_SetPriority(TIMER_32_0_IRQn, 32);
+	NVIC_SetPriority(TIMER_32_0_IRQn, 5);
 	NVIC_ClearPendingIRQ(TIMER_32_0_IRQn);
 	NVIC_EnableIRQ(TIMER_32_0_IRQn);
 	return;
@@ -78,18 +79,23 @@ void TIMER32_0_IRQHandler(void)
 	}
 }
 
-uint8_t addVector(int16_t x, int16_t y, int8_t z){
-	if(RingBuffer_IsFull(&vectorbuf))
+uint8_t addVector(int16_t x, int16_t y, int8_t z, uint8_t f){
+	if(vbufCount == 30)
 		return 1;
 
+	//printf("Vector1 %d %d %d \n", x, y, z);
 	VECTOR_T tmp;
 	tmp.x = x;
 	tmp.y = y;
 	tmp.z = z;
+	tmp.f = f;
 
-	RingBuffer_Insert(&vectorbuf, &tmp);
+	vectorbuf_base[vbufT++] = tmp;
+	if(vbufT > 30)
+		vbufT = 0;
+	vbufCount++;
 
-	//printf("Vector %d %d %d \n", x, y, z);
+	//printf("Vector2 %d %d %d \n", x, y, z);
 
 	return 0;
 }
@@ -157,7 +163,9 @@ uint8_t bufferHasEnoughRoom(int32_t x, int32_t y, int8_t z){
 	x = x < 0 ? x * (-1) : x;
 	y = y < 0 ? y * (-1) : y;
 	z = z < 0 ? z * (-1) : z;
-	return (RingBuffer_GetFree(&movebuf) >= (MAX(MAX(x, y) , z) + 1));
+	//printf("Free: %d\n", RingBuffer_GetFree(&movebuf));
+	return (RingBuffer_GetFree(&movebuf) >= (MAX(MAX(x, y) , z) + 2));
+
 }
 
 void InsertMove(int8_t x, int8_t y, int8_t z){
@@ -165,6 +173,7 @@ void InsertMove(int8_t x, int8_t y, int8_t z){
 	tmp.x = x;
 	tmp.y = y;
 	tmp.z = z;
+	tmp.f = 0;
 
 	RingBuffer_Insert(&movebuf, &tmp);
 
@@ -193,17 +202,39 @@ void StepY(int8_t direction){
 }
 
 void SetSpeed(uint16_t rate){
-	feedrate = 200 / rate; //rate -> (mm/s)
+	if(rate <= 0)
+		return;
+
+	uint32_t timerFreq;
+	timerFreq = Chip_Clock_GetSystemClockRate();
+
+	NVIC_DisableIRQ(TIMER_32_0_IRQn);
+
+	Chip_TIMER_Reset(LPC_TIMER32_0);
+	Chip_TIMER_MatchEnableInt(LPC_TIMER32_0, 0);
+	Chip_TIMER_SetMatch(LPC_TIMER32_0, 0, (timerFreq / rate));
+	Chip_TIMER_MatchEnableInt(LPC_TIMER32_0, 1);
+	Chip_TIMER_SetMatch(LPC_TIMER32_0, 1, (timerFreq / rate) * 2);
+	Chip_TIMER_ResetOnMatchEnable(LPC_TIMER32_0, 1);
+	Chip_TIMER_Enable(LPC_TIMER32_0);
+
+	/* Enable timer interrupt */
+	NVIC_SetPriority(TIMER_32_0_IRQn, 5);
+	NVIC_ClearPendingIRQ(TIMER_32_0_IRQn);
+	NVIC_EnableIRQ(TIMER_32_0_IRQn);
+	return;
 }
 
 void processMoves(void){
-	static  I2C_XFER_T xfer;
 	MOVE_T aMove;
 
 	if(RingBuffer_IsEmpty(&movebuf))
 		return;
 
 	RingBuffer_Pop(&movebuf, &aMove);
+
+	if(aMove.f)
+		SetSpeed(aMove.f);
 
 	if(aMove.x)
 		StepX(aMove.x);
@@ -212,10 +243,10 @@ void processMoves(void){
 
 	if(aMove.z){
 		if(aMove.z > 0){
-			i2c_pump(&xfer, 1);
+			i2c_pump(1);
 			//Chip_I2C_MasterSend(i2cDev, xfer.slaveAddr, xfer.txBuff, xfer.txSz);
 		}else{
-			i2c_pump(&xfer, 0);
+			i2c_pump(2);
 			//Chip_I2C_MasterSend(i2cDev, xfer.slaveAddr, xfer.txBuff, xfer.txSz);
 		}
 	}
@@ -225,56 +256,56 @@ void processMoves(void){
 }
 
 void processVectors(void){
-	if(RingBuffer_IsEmpty(&vectorbuf))
+	if(vbufCount == 0)
 		return;
 
-	uint8_t i = RB_INDT(&vectorbuf);
-	VECTOR_T* data = (VECTOR_T*)vectorbuf.data;
-
-	if(!bufferHasEnoughRoom(data[i].x, data[i].y, data[i].z))
+	if(!bufferHasEnoughRoom(vectorbuf_base[vbufH].x, vectorbuf_base[vbufH].y, vectorbuf_base[vbufH].z))
 		return;
 
 
-	VECTOR_T tmp;
-	RingBuffer_Pop(&vectorbuf, &tmp);
+	VECTOR_T tmp = vectorbuf_base[vbufH++];
+	if(vbufH > 30)
+		vbufH = 0;
+	vbufCount--;
 
+	if(tmp.f){
+		MOVE_T tmp2;
+		tmp2.x = 0;
+		tmp2.y = 0;
+		tmp2.z = 0;
+		tmp2.f = tmp.f;
+
+		RingBuffer_Insert(&movebuf, &tmp2);
+	}
+	//printf("DeCompose %d %d %d\n", tmp.x, tmp.y, tmp.z);
 	moveRelativly(tmp.x, tmp.y, tmp.z);
+
 
 	return;
 }
 
-void i2c_pump(I2C_XFER_T *xfer, uint8_t ops)
+void i2c_pump(uint8_t ops)
 {
-	I2CWriteLength = 4;
-	I2CReadLength = 0;
-	I2CMasterBuffer[0] = pumpAddr;
-	I2CMasterBuffer[1] = 0x62;		/* address */
-	I2CMasterBuffer[2] = Pressure >> 8;
-	I2CMasterBuffer[3] = Pressure & 0xFF;
-	I2CEngine();
-	/*
-	xfer->slaveAddr = pumpAddr;
-	xfer->rxBuff = 0;
-	xfer->txBuff = 0;
-	xfer->txSz = 0;
-	xfer->rxSz = 0;
-
 	if (ops == 1) {
-		i2cbuffer[0][0] = 0x62;
-		i2cbuffer[0][1] = Pressure >> 8;
-		i2cbuffer[0][2] = Pressure & 0xFF;
-		xfer->txSz = 3;
-		xfer->txBuff = i2cbuffer[0];
+		I2CWriteLength = 4;
+		I2CReadLength = 0;
+		I2CMasterBuffer[0] = pumpAddr;
+		I2CMasterBuffer[1] = 0x62;		/* address */
+		I2CMasterBuffer[2] = Pressure >> 8;
+		I2CMasterBuffer[3] = Pressure & 0xFF;
+		I2CEngine();
 	}
 
-	if (ops == 2) {
-		i2cbuffer[0][0] = 0x62;
-		i2cbuffer[0][1] = 0 >> 8;
-		i2cbuffer[0][2] = 0 & 0xFF;
-		xfer->txSz = 3;
-		xfer->txBuff = i2cbuffer[0];
+	else if (ops == 2) {
+		I2CWriteLength = 4;
+		I2CReadLength = 0;
+		I2CMasterBuffer[0] = pumpAddr;
+		I2CMasterBuffer[1] = 0x62;		/* address */
+		I2CMasterBuffer[2] = 0 >> 8;
+		I2CMasterBuffer[3] = 0 & 0xFF;
+		I2CEngine();
 	}
-	*/
+
 }
 
 

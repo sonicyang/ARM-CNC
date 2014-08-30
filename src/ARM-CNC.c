@@ -37,8 +37,6 @@ int main(void) {
     UART_init();
     motorControllerInit();
 
-
-
     startTimer(5, &UART_REVEICE_FLAG);
     startTimer(23, &UART_TRANSMIT_FLAG);
     startTimer(17, &VECTOR_PROCESS_FLAG);

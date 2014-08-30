@@ -13,15 +13,15 @@ class PACKET_T:
         self.magicNumber = [0xAA, 0xAA, 0xAA]
         self.transmissionNumber = 0
         self.command = 0
-        self.data = [0] * 3 
+        self.data = [0] * 4 
         self.checksum = 0
 
-PACKET_FMT = "<3BB3hB"   #packet formant
-PACKET_SIZE = 11 
+PACKET_FMT = "<3BB4hB"   #packet formant
+PACKET_SIZE = 13 
 
 IDLE    = 1
 MOVE    = 2   
-ACTIVE  = 3
+SPEEDSET  = 3
 DEACTIVE= 4
 ACK     = 5
 NAK     = 6
@@ -100,22 +100,24 @@ def UART_Send_ECHO(num):
     
     txbuf.put(packet)
 
-def UART_Send_MOVE(x, y, z):
+def UART_Send_MOVE(x, y, z, feedrate):
     global txbuf
 
     packet = PACKET_T()
     packet.command = MOVE 
-    packet.data[0] = x
-    packet.data[1] = y
-    packet.data[2] = z
+    packet.data[0] = int(x)
+    packet.data[1] = int(y)
+    packet.data[2] = int(z)
+    packet.data[3] = int(feedrate)
     
     txbuf.put(packet)
 
-def UART_Send_ACTIVATE():
+def UART_Send_SPEED(s):
     global txbuf
 
     packet = PACKET_T()
-    packet.command = ACTIVE
+    packet.command = SPEEDSET 
+    packet.data[0] = s
     
     txbuf.put(packet)
 
@@ -128,7 +130,8 @@ def UART_Send_DEACTIVATE():
     txbuf.put(packet)
 def calculateCheckSum(packet):
     chksum = (packet.command \
-            + packet.data[0] + packet.data[1] + packet.data[2]) 
+            + packet.data[0] + packet.data[1] + packet.data[2] + packet.data[3])
+    chksum = int(chksum)
     return (((chksum >> 8) + chksum)) & 0xFF
 
 def UARTTranciver(portname):
@@ -156,7 +159,8 @@ def UARTTranciver(portname):
             time.sleep(2)
 
         if(UART_NAK_FLAG or UART_TIMEOUT_FLAG or UART_TAL_FLAG):
-            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.checksum))
+            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.data[3],\
+                    repeat_buf.checksum))
             
             print("ReSend", repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1])
             
@@ -171,9 +175,10 @@ def UARTTranciver(portname):
             
             repeat_buf = packet
 
-            print("Send", packet.command, packet.data[0], packet.data[1])
+            print("Send", packet.command, packet.data[0], packet.data[1], packet.data[2], packet.data[3], repeat_buf.checksum)
 
-            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.checksum))
+            ser.write(struct.pack(PACKET_FMT, 0xAA, 0xAA, 0xAA, repeat_buf.command, repeat_buf.data[0], repeat_buf.data[1], repeat_buf.data[2], repeat_buf.data[3],\
+                    repeat_buf.checksum))
             ser.flush()
 
             UART_ACK_PENDING = 1
@@ -198,7 +203,7 @@ def UARTTranciver(portname):
             packet = PACKET_T()
             packet.magicNumber[0], packet.magicNumber[1], packet.magicNumber[2],\
                     packet.command, packet.data[0], packet.data[1], \
-                    packet.data[2],\
+                    packet.data[2], packet.data[3], \
                     packet.checksum = struct.unpack(PACKET_FMT, raw_data);
             
             if(calculateCheckSum(packet) != packet.checksum):

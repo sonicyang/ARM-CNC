@@ -8,7 +8,7 @@
  *   2008.07.19  ver 1.00    Preliminary version, first Release
  *
 *****************************************************************************/
-//#include "cmsis_1343.h"			/* LPC134x Peripheral Registers */
+#include "cmsis_1343.h"			/* LPC134x Peripheral Registers */
 #include "lpc_types.h"
 #include "i2c.h"
 #include "board.h"
@@ -226,7 +226,6 @@ uint32_t I2CInit( uint32_t I2cMode )
   reset are overlapped, a known bug, for now, both SSP 
   and I2C use bit 0 for reset enable. Once the problem
   is fixed, change to "#if 1". */
-
 #if 1
   LPC_SYSCTL->PRESETCTRL |= (0x1<<1);
 #else
@@ -234,9 +233,7 @@ uint32_t I2CInit( uint32_t I2cMode )
 #endif
   LPC_SYSCTL->SYSAHBCLKCTRL |= (1<<5);
   ((LPC_IOCON_TypeDef_OLD*)LPC_IOCON)->PIO0_4 &= ~0x3F;	/*  I2C I/O config */
-
   ((LPC_IOCON_TypeDef_OLD*)LPC_IOCON)->PIO0_4 |= 0x01;		/* I2C SCL */
-
   ((LPC_IOCON_TypeDef_OLD*)LPC_IOCON)->PIO0_5 &= ~0x3F;
   ((LPC_IOCON_TypeDef_OLD*)LPC_IOCON)->PIO0_5 |= 0x01;		/* I2C SDA */
 
@@ -260,6 +257,7 @@ uint32_t I2CInit( uint32_t I2cMode )
   }    
 
   /* Enable the I2C Interrupt */
+  NVIC_SetPriority(I2C0_IRQn, 2);
   NVIC_EnableIRQ(I2C0_IRQn);
 
   LPC_I2C->CONSET = I2CONSET_I2EN;
