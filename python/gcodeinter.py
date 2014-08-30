@@ -25,8 +25,8 @@ from numpy import pi, sin, cos, sqrt, arccos, arcsin
 ################################################################################################
 ################################################################################################
 
-dx=0.2  #resolution in x direction. Unit: mm
-dy=0.2  #resolution in y direction. Unit: mm
+dx=0.3  #resolution in x direction. Unit: mm
+dy=0.3  #resolution in y direction. Unit: mm
 dz=1
 
 mmdx = dx
@@ -80,7 +80,7 @@ def XYZFposition(lines):
         i=zchar_loc+1 
         while (47<ord(lines[i])<58)|(lines[i]=='.')|(lines[i]=='-'):
             i+=1 
-        z_pos=(-1) * float(lines[zchar_loc+1:i])     
+        z_pos=float(lines[zchar_loc+1:i])     
     except:
         pass
     
@@ -227,12 +227,12 @@ def ExcuteGCode(lines):
     elif (lines[0:3]=='G1F')|(lines[0:4]=='G1 F'):
         pass
 
-    elif (lines[0]=='F'):
+    elif (lines[0:1]=='F'):
 
         [x_pos, y_pos, z_pos, feedrate]=XYZFposition(lines)
         moveto(x_pos, y_pos, z_pos, feedrate)
 
-    elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0:3]=='G00')|(lines[0]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
+    elif (lines[0:3]=='G0 ')|(lines[0:3]=='G1 ')|(lines[0:3]=='G01')|(lines[0:3]=='G00')|(lines[0:1]==" "):#|(lines[0:3]=='G02')|(lines[0:3]=='G03'):
         
         [x_pos, y_pos, z_pos, feedrate]=XYZFposition(lines)
         moveto(x_pos, y_pos, z_pos, feedrate)

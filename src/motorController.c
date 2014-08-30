@@ -233,8 +233,10 @@ void processMoves(void){
 
 	RingBuffer_Pop(&movebuf, &aMove);
 
-	if(aMove.f)
+	if(aMove.f){
 		SetSpeed(aMove.f);
+		processMoves();
+	}
 
 	if(aMove.x)
 		StepX(aMove.x);
