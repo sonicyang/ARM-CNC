@@ -42,6 +42,7 @@ The following procdure demonstrate how to use a svg file to control the machine.
 
 10. Now you will need to open a console window at the PC Side Code Directory, issue the following Command
     > python ./main.py -f path/to/gcode/file
+    > 
     > (Make Sure your python is link to the right version(python 3), you might want to use python3 instead)
 
 11. Choose the right Serial Port and press Enter
